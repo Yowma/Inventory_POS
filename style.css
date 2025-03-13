@@ -1,0 +1,130 @@
+/* Sidebar */
+.sidebar {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 100;
+    padding: 48px 0 0;
+    box-shadow: inset -1px 0 0 rgba(0, 0, 0, .1);
+}
+
+.sidebar-sticky {
+    position: relative;
+    top: 0;
+    height: calc(100vh - 48px);
+    padding-top: .5rem;
+    overflow-x: hidden;
+    overflow-y: auto;
+}
+
+.sidebar .nav-link {
+    font-weight: 500;
+    color: #fff;
+}
+
+.sidebar .nav-link.active {
+    background-color: #00C4B4;
+    color: #fff;
+}
+
+/* Product List */
+#product_list .product-item {
+    border: 1px solid #ced4da;
+    padding: 15px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-align: center;
+}
+
+#product_list .product-item:hover {
+    background-color: #e9ecef;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    transform: translateY(-2px);
+}
+
+#product_list img {
+    margin-bottom: 10px;
+}
+
+#product_list h5 {
+    font-size: 1.1rem;
+    color: #343a40;
+}
+
+#product_list p {
+    color: #6c757d;
+    font-weight: bold;
+}
+
+/* Cart Table */
+#cart_table th {
+    background-color: #2C2F33;
+    color: white;
+}
+
+#cart_table td {
+    vertical-align: middle;
+}
+
+.quantity {
+    width: 70px;
+    text-align: center;
+}
+
+.btn-success {
+    background-color: #28a745;
+    border: none;
+}
+
+.btn-success:hover {
+    background-color: #218838;
+}
+
+.btn-danger {
+    background-color: #dc3545;
+    border: none;
+}
+
+.btn-danger:hover {
+    background-color: #c82333;
+}
+#sidebar {
+    position: fixed;
+    top: 56px; /* Height of Bootstrap navbar */
+    left: 0;
+    height: calc(100% - 56px); /* Full height minus navbar */
+    width: 50px; /* Increased default width for icons */
+    transition: width 0.3s ease; /* Smooth expansion */
+    background-color: #fff; /* White background to match image */
+    border-right: 1px solid #dee2e6; /* Subtle border */
+    overflow: hidden; /* Hide content when narrow */
+}
+#sidebar:hover {
+    width: 200px; /* Full width on hover */
+}
+#sidebar ul {
+    list-style-type: none;
+    padding: 0;
+    margin: 0;
+}
+#sidebar li {
+    padding: 15px 10px; /* Increased padding for better spacing */
+    white-space: nowrap; /* Prevent text wrapping */
+}
+#sidebar a {
+    text-decoration: none;
+    color: #333; /* Black icons and text to match image */
+    display: flex;
+    align-items: center;
+}
+#sidebar a i {
+    margin-right: 10px;
+    width: 30px; /* Fixed width for icons to align properly */
+    text-align: center;
+    font-size: 1.2rem; /* Slightly larger icons */
+}
+#sidebar a:hover {
+    background-color: #f8f9fa; /* Light gray hover effect */
+}
