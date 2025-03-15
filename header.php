@@ -4,13 +4,16 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Powerguide Solutions Inc.</title>
-    <!-- Bootstrap CSS -->
-    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
-    <!-- Font Awesome for icons (including bell) -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <!-- Bootstrap CSS (using latest 5.3.0) -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
+    <!-- Poppins Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <!-- Custom CSS -->
     <style>
         body {
+            font-family: 'Poppins', sans-serif !important;
             background-color: #f4f6f9;
         }
         #sidebar {
@@ -46,15 +49,15 @@
         }
         #sidebar a i {
             font-size: 20px;
-            width: 40px; /* Fixed width for icons */
+            width: 40px;
             text-align: center;
         }
         #sidebar a span {
-            opacity: 0; /* Hide text by default */
+            opacity: 0;
             transition: opacity 0.3s ease;
         }
         #sidebar:hover a span {
-            opacity: 1; /* Show text on hover */
+            opacity: 1;
         }
         #sidebar a:hover {
             background-color: #495057;
@@ -81,11 +84,13 @@
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
         .navbar-brand {
-            font-weight: bold;
+            font-family: 'Poppins', sans-serif;
+            font-weight: 600;
             font-size: 1.5rem;
             color: #007bff !important;
         }
         .nav-link {
+            font-family: 'Poppins', sans-serif;
             font-size: 1rem;
             color: #333 !important;
         }
@@ -97,9 +102,12 @@
 <body>
     <nav class="navbar navbar-expand-lg navbar-light bg-light">
         <a class="navbar-brand" href="dashboard.php">Powerguide Solutions Inc.</a>
-        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav">
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
             <span class="navbar-toggler-icon"></span>
         </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <!-- Add additional navbar items if needed -->
+        </div>
     </nav>
 
     <!-- Sidebar -->
@@ -115,11 +123,13 @@
 
     <!-- Main content area with offset for sidebar -->
     <div class="container main-content">
-        <!-- Dynamic content will be included here -->
+        <!-- Dynamic content will be included here via PHP include -->
     </div>
 
     <!-- JavaScript at the bottom -->
-    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
-    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.bundle.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Font Awesome -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/js/all.min.js"></script>
 </body>
 </html>

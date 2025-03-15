@@ -128,3 +128,47 @@
 #sidebar a:hover {
     background-color: #f8f9fa; /* Light gray hover effect */
 }
+body {
+    font-family: 'Poppins', sans-serif !important;
+}
+h1, h2, h3, h4, h5, h6 {
+    font-family: 'Poppins', sans-serif;
+    font-weight: 600;
+}
+.text-muted {
+    font-family: 'Poppins', sans-serif;
+    font-weight: 400;
+}
+table {
+    font-family: 'Poppins', sans-serif;
+    font-weight: 400;
+}
+.product-item {
+    border: 1px solid #dee2e6; /* Subtle gray border */
+    padding: 15px; /* Inner spacing */
+    margin: 10px; /* Increased margin on all sides for spacing */
+    background-color: #ffffff; /* White background */
+    border-radius: 15px; /* Curved borders */
+    text-align: center; /* Center-align text */
+    cursor: pointer; /* Indicate clickable */
+    transition: all 0.3s ease; /* Smooth hover effect */
+}
+.product-item:hover {
+    transform: scale(1.05); /* Slightly enlarge the box */
+    border-color: #007bff; /* Blue border on hover */
+    background-color: #e9ecef; /* Slightly darker background */
+    box-shadow: 0 6px 12px rgba(0, 123, 255, 0.2); /* Shadow with blue tint */
+    color: #0056b3; /* Darker blue text for contrast */
+}
+.product-item h5, .product-item p {
+    transition: color 0.3s ease; /* Smooth text color transition */
+}
+/* Optional: Adjust the row to add gutter spacing */
+#product_list.row {
+    margin-right: -15px;
+    margin-left: -15px;
+}
+#product_list .col-md-3 {
+    padding-right: 15px;
+    padding-left: 15px;
+}

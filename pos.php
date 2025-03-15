@@ -13,37 +13,7 @@ $result = $conn->query($sql);
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Point of Sale</title>
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
-    <style>
-        .product-item {
-            border: 1px solid #dee2e6; /* Subtle gray border */
-            padding: 15px; /* Inner spacing */
-            margin: 10px; /* Increased margin on all sides for spacing */
-            background-color: #ffffff; /* White background */
-            border-radius: 15px; /* Curved borders */
-            text-align: center; /* Center-align text */
-            cursor: pointer; /* Indicate clickable */
-            transition: all 0.3s ease; /* Smooth hover effect */
-        }
-        .product-item:hover {
-            transform: scale(1.05); /* Slightly enlarge the box */
-            border-color: #007bff; /* Blue border on hover */
-            background-color: #e9ecef; /* Slightly darker background */
-            box-shadow: 0 6px 12px rgba(0, 123, 255, 0.2); /* Shadow with blue tint */
-            color: #0056b3; /* Darker blue text for contrast */
-        }
-        .product-item h5, .product-item p {
-            transition: color 0.3s ease; /* Smooth text color transition */
-        }
-        /* Optional: Adjust the row to add gutter spacing */
-        #product_list.row {
-            margin-right: -15px;
-            margin-left: -15px;
-        }
-        #product_list .col-md-3 {
-            padding-right: 15px;
-            padding-left: 15px;
-        }
-    </style>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <div class="container mt-5">
