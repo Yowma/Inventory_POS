@@ -5,103 +5,16 @@ include 'db.php';
 include 'header.php';
 ?>
 
-<!-- Dynamic content within .main-content -->
-<style>
-    .table th, .table td {
-        padding: 12px 15px;
-        vertical-align: middle;
-    }
-    .table thead th {
-        background-color: #f8f9fa;
-        border-bottom: 2px solid #dee2e6;
-        font-weight: 600;
-        text-transform: uppercase;
-        font-size: 0.9rem;
-    }
-    .table tbody tr:nth-child(odd) {
-        background-color: #ffffff;
-    }
-    .table tbody tr:nth-child(even) {
-        background-color: #f8f9fa;
-    }
-    .table tbody tr:hover {
-        background-color: #e9ecef;
-    }
-    .badge-low-stock {
-        background-color: #dc3545;
-        color: #fff;
-        padding: 5px 10px;
-        border-radius: 12px;
-    }
-    .badge-in-stock {
-        background-color: #28a745;
-        color: #fff;
-        padding: 5px 10px;
-        border-radius: 12px;
-    }
-    .btn-action {
-        margin-right: 5px;
-        padding: 6px 12px;
-        font-size: 0.9rem;
-        border-radius: 4px;
-    }
-    .btn-edit {
-        background-color: #ffc107;
-        border-color: #ffc107;
-        color: #fff;
-    }
-    .btn-edit:hover {
-        background-color: #e0a800;
-        border-color: #e0a800;
-    }
-    .btn-delete {
-        background-color: #dc3545;
-        border-color: #dc3545;
-        color: #fff;
-    }
-    .btn-delete:hover {
-        background-color: #c82333;
-        border-color: #c82333;
-    }
-    .btn-receive {
-        background-color: #17a2b8;
-        border-color: #17a2b8;
-        color: #fff;
-    }
-    .btn-receive:hover {
-        background-color: #138496;
-        border-color: #138496;
-    }
-    .card {
-        border: none;
-        border-radius: 8px;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-    }
-    .card-header {
-        background-color: #ffffff;
-        border-bottom: none;
-        padding: 20px 25px;
-    }
-    .card-body {
-        padding: 25px;
-    }
-    .notification-wrapper .badge {
-        font-size: 0.7rem;
-        padding: 4px 6px;
-    }
-</style>
-
 <div class="main-content">
     <div class="card">
         <div class="card-header d-flex justify-content-between align-items-center">
             <h2 class="mb-0">Product Management</h2>
             <div class="d-flex align-items-center">
-                <div class="notification-wrapper position-relative mr-3">
+                <div class="notification-wrapper position-relative me-3">
                     <div class="dropdown">
-                        <button class="btn btn-link position-relative" type="button" id="notificationDropdown" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                        <button class="btn btn-link position-relative" type="button" id="notificationDropdown" data-bs-toggle="dropdown" aria-expanded="false">
                             <i class="fas fa-bell fa-lg"></i>
                             <?php
-                            // Get low stock notifications
                             $notificationSql = "SELECT n.*, p.name FROM notifications n 
                                                 JOIN products p ON n.product_id = p.product_id 
                                                 WHERE n.is_read = 0 
@@ -112,19 +25,19 @@ include 'header.php';
                             }
                             $notificationCount = $notifications->num_rows;
                             if ($notificationCount > 0): ?>
-                                <span class="position-absolute badge badge-danger" style="top: -5px; right: -10px;">
+                                <span class="position-absolute top-0 start-100 translate-middle badge bg-danger rounded-pill" style="font-size: 0.7rem;">
                                     <?php echo $notificationCount; ?>
                                 </span>
                             <?php endif; ?>
                         </button>
-                        <div class="dropdown-menu dropdown-menu-right p-0" aria-labelledby="notificationDropdown" style="width: 300px; max-height: 400px; overflow-y: auto;">
+                        <div class="dropdown-menu dropdown-menu-end p-0" aria-labelledby="notificationDropdown" style="width: 300px; max-height: 400px; overflow-y: auto;">
                             <div class="d-flex justify-content-between align-items-center p-2 bg-light">
                                 <h6 class="m-0">Notifications</h6>
                                 <?php if ($notificationCount > 0): ?>
                                     <a href="mark_all_read.php" class="btn btn-sm btn-link">Mark all as read</a>
                                 <?php endif; ?>
                             </div>
-                            <div class="dropdown-divider m-0"></div>
+                            <hr class="dropdown-divider m-0">
                             <?php if ($notificationCount > 0): ?>
                                 <?php while ($notification = $notifications->fetch_assoc()): ?>
                                     <a class="dropdown-item py-2 border-bottom" href="mark_read.php?id=<?php echo $notification['notification_id']; ?>">
@@ -134,14 +47,12 @@ include 'header.php';
                                     </a>
                                 <?php endwhile; ?>
                             <?php else: ?>
-                                <div class="p-3 text-center text-muted">
-                                    No new notifications
-                                </div>
+                                <div class="p-3 text-center text-muted">No new notifications</div>
                             <?php endif; ?>
                         </div>
                     </div>
                 </div>
-                <button class="btn btn-primary" data-toggle="modal" data-target="#addProductModal">Add Product</button>
+                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addProductModal">Add Product</button>
             </div>
         </div>
         <div class="card-body">
@@ -161,7 +72,7 @@ include 'header.php';
                     $sql = "SELECT * FROM products";
                     $result = $conn->query($sql);
                     while ($product = $result->fetch_assoc()): 
-                        $isLowStock = $product['quantity'] <= 10; // Low stock if quantity <= 10
+                        $isLowStock = $product['quantity'] <= 10;
                     ?>
                         <tr>
                             <td><?php echo $product['product_id']; ?></td>
@@ -176,9 +87,9 @@ include 'header.php';
                                 <?php endif; ?>
                             </td>
                             <td>
-                                <button class="btn btn-action btn-edit" data-toggle="modal" data-target="#editProductModal" data-id="<?php echo $product['product_id']; ?>">Edit</button>
+                                <button class="btn btn-action btn-edit" data-bs-toggle="modal" data-bs-target="#editProductModal" data-id="<?php echo $product['product_id']; ?>">Edit</button>
                                 <a href="delete_product.php?id=<?php echo $product['product_id']; ?>" class="btn btn-action btn-delete" onclick="return confirm('Are you sure?')">Delete</a>
-                                <button class="btn btn-action btn-receive" data-toggle="modal" data-target="#receiveStockModal" data-id="<?php echo $product['product_id']; ?>">Receive Stock</button>
+                                <button class="btn btn-action btn-receive" data-bs-toggle="modal" data-bs-target="#receiveStockModal" data-id="<?php echo $product['product_id']; ?>">Receive Stock</button>
                             </td>
                         </tr>
                     <?php endwhile; ?>
@@ -188,30 +99,30 @@ include 'header.php';
     </div>
 
     <!-- Add Product Modal -->
-    <div class="modal fade" id="addProductModal">
+    <div class="modal fade" id="addProductModal" tabindex="-1" aria-labelledby="addProductModalLabel" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">
                 <form action="add_product.php" method="post">
                     <div class="modal-header">
-                        <h5 class="modal-title">Add Product</h5>
-                        <button type="button" class="close" data-dismiss="modal">×</button>
+                        <h5 class="modal-title" id="addProductModalLabel">Add Product</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div class="modal-body">
-                        <div class="form-group">
-                            <label for="name">Name</label>
+                        <div class="mb-3">
+                            <label for="name" class="form-label">Name</label>
                             <input type="text" class="form-control" id="name" name="name" required>
                         </div>
-                        <div class="form-group">
-                            <label for="price">Price</label>
+                        <div class="mb-3">
+                            <label for="price" class="form-label">Price</label>
                             <input type="number" step="0.01" class="form-control" id="price" name="price" required>
                         </div>
-                        <div class="form-group">
-                            <label for="quantity">Quantity</label>
+                        <div class="mb-3">
+                            <label for="quantity" class="form-label">Quantity</label>
                             <input type="number" class="form-control" id="quantity" name="quantity" required>
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                         <button type="submit" class="btn btn-primary">Add Product</button>
                     </div>
                 </form>
@@ -220,31 +131,31 @@ include 'header.php';
     </div>
 
     <!-- Edit Product Modal -->
-    <div class="modal fade" id="editProductModal">
+    <div class="modal fade" id="editProductModal" tabindex="-1" aria-labelledby="editProductModalLabel" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">
                 <form action="edit_product.php" method="post">
                     <div class="modal-header">
-                        <h5 class="modal-title">Edit Product</h5>
-                        <button type="button" class="close" data-dismiss="modal">×</button>
+                        <h5 class="modal-title" id="editProductModalLabel">Edit Product</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div class="modal-body">
                         <input type="hidden" id="edit_product_id" name="product_id">
-                        <div class="form-group">
-                            <label for="edit_name">Name</label>
+                        <div class="mb-3">
+                            <label for="edit_name" class="form-label">Name</label>
                             <input type="text" class="form-control" id="edit_name" name="name" required>
                         </div>
-                        <div class="form-group">
-                            <label for="edit_price">Price</label>
+                        <div class="mb-3">
+                            <label for="edit_price" class="form-label">Price</label>
                             <input type="number" step="0.01" class="form-control" id="edit_price" name="price" required>
                         </div>
-                        <div class="form-group">
-                            <label for="edit_quantity">Quantity</label>
+                        <div class="mb-3">
+                            <label for="edit_quantity" class="form-label">Quantity</label>
                             <input type="number" class="form-control" id="edit_quantity" name="quantity" required>
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                         <button type="submit" class="btn btn-primary">Save Changes</button>
                     </div>
                 </form>
@@ -253,23 +164,23 @@ include 'header.php';
     </div>
 
     <!-- Receive Stock Modal -->
-    <div class="modal fade" id="receiveStockModal">
+    <div class="modal fade" id="receiveStockModal" tabindex="-1" aria-labelledby="receiveStockModalLabel" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">
                 <form action="receive_stock.php" method="post">
                     <div class="modal-header">
-                        <h5 class="modal-title">Receive Stock</h5>
-                        <button type="button" class="close" data-dismiss="modal">×</button>
+                        <h5 class="modal-title" id="receiveStockModalLabel">Receive Stock</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div class="modal-body">
                         <input type="hidden" id="receive_product_id" name="product_id">
-                        <div class="form-group">
-                            <label for="receive_quantity">Quantity to Add</label>
+                        <div class="mb-3">
+                            <label for="receive_quantity" class="form-label">Quantity to Add</label>
                             <input type="number" class="form-control" id="receive_quantity" name="quantity" required min="1">
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                         <button type="submit" class="btn btn-primary">Add Stock</button>
                     </div>
                 </form>
@@ -294,7 +205,8 @@ $(document).ready(function() {
                 $('#edit_quantity').val(data.quantity);
             },
             error: function(xhr, status, error) {
-                console.error('AJAX error: ' + error);
+                console.error('AJAX Error: ' + error);
+                alert('Failed to load product data.');
             }
         });
     });
@@ -310,5 +222,58 @@ $(document).ready(function() {
     });
 });
 </script>
+
+<style>
+    .table th, .table td {
+        padding: 12px 15px;
+        vertical-align: middle;
+    }
+    .table thead th {
+        background-color: #f8f9fa;
+        border-bottom: 2px solid #dee2e6;
+        font-weight: 600;
+        text-transform: uppercase;
+        font-size: 0.9rem;
+    }
+    .table tbody tr:nth-child(odd) { background-color: #ffffff; }
+    .table tbody tr:nth-child(even) { background-color: #f8f9fa; }
+    .table tbody tr:hover { background-color: #e9ecef; }
+    .badge-low-stock {
+        background-color: #dc3545;
+        color: #fff;
+        padding: 5px 10px;
+        border-radius: 12px;
+    }
+    .badge-in-stock {
+        background-color: #28a745;
+        color: #fff;
+        padding: 5px 10px;
+        border-radius: 12px;
+    }
+    .btn-action {
+        margin-right: 5px;
+        padding: 6px 12px;
+        font-size: 0.9rem;
+        border-radius: 4px;
+    }
+    .btn-edit { background-color: #ffc107; border-color: #ffc107; color: #fff; }
+    .btn-edit:hover { background-color: #e0a800; border-color: #e0a800; }
+    .btn-delete { background-color: #dc3545; border-color: #dc3545; color: #fff; }
+    .btn-delete:hover { background-color: #c82333; border-color: #c82333; }
+    .btn-receive { background-color: #17a2b8; border-color: #17a2b8; color: #fff; }
+    .btn-receive:hover { background-color: #138496; border-color: #138496; }
+    .card {
+        border: none;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+    .card-header {
+        background-color: #ffffff;
+        border-bottom: none;
+        padding: 20px 25px;
+    }
+    .card-body { padding: 25px; }
+    .notification-wrapper .badge { font-size: 0.7rem; padding: 4px 6px; }
+</style>
 
 <?php include 'footer.php'; ?>

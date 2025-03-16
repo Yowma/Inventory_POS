@@ -172,3 +172,101 @@ table {
     padding-right: 15px;
     padding-left: 15px;
 }
+body {
+    font-family: 'Poppins', sans-serif;
+    background-color: #f4f6f9;
+    margin: 0; /* Remove default margin */
+    padding: 0; /* Remove default padding */
+}
+
+/* Navbar */
+.navbar {
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1030; /* Above sidebar */
+}
+.navbar-brand {
+    font-weight: 600;
+    font-size: 1.5rem;
+    color: #007bff !important;
+}
+
+/* Sidebar */
+#sidebar {
+    position: fixed;
+    top: 56px; /* Below navbar */
+    left: 0;
+    bottom: 0; /* Extend to bottom of viewport */
+    width: 60px; /* Default collapsed width */
+    background-color: #343a40;
+    transition: width 0.3s ease;
+    overflow-y: auto; /* Scroll if content exceeds height */
+    overflow-x: hidden;
+    z-index: 1000; /* Below navbar, above content */
+}
+#sidebar:hover {
+    width: 220px; /* Expanded width */
+}
+#sidebar ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+#sidebar li {
+    padding: 10px;
+}
+#sidebar a {
+    display: flex;
+    align-items: center;
+    color: #ffffff;
+    text-decoration: none;
+    padding: 10px;
+    transition: background-color 0.2s ease;
+}
+#sidebar a i {
+    font-size: 1.25rem;
+    width: 40px;
+    text-align: center;
+    flex-shrink: 0; /* Prevent icon from shrinking */
+}
+#sidebar a span {
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    white-space: nowrap;
+}
+#sidebar:hover a span {
+    opacity: 1;
+}
+#sidebar a:hover {
+    background-color: #495057;
+}
+
+/* Main Content */
+.main-content {
+    margin-left: 60px; /* Match sidebar collapsed width */
+    padding: 80px 20px 20px; /* Top padding for fixed navbar */
+    transition: margin-left 0.3s ease;
+    min-height: 100vh; /* Ensure content fills height */
+}
+#sidebar:hover ~ .main-content {
+    margin-left: 220px; /* Match sidebar expanded width */
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    #sidebar {
+        width: 0; /* Hidden by default on mobile */
+    }
+    #sidebar:hover {
+        width: 220px; /* Expand on hover/touch */
+    }
+    .main-content {
+        margin-left: 0;
+    }
+    #sidebar:hover ~ .main-content {
+        margin-left: 0; /* Prevent content shift on mobile */
+    }
+}
