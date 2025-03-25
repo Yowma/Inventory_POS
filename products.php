@@ -6,6 +6,13 @@ include 'header.php';
 ?>
 
 <div class="main-content">
+    <?php
+    // Check if refresh is needed from a POS sale
+    if (isset($_SESSION['refresh_products']) && $_SESSION['refresh_products']) {
+        unset($_SESSION['refresh_products']);
+        echo '<script>window.location.reload();</script>';
+    }
+    ?>
     <div class="card">
         <div class="card-header d-flex justify-content-between align-items-center">
             <h2 class="mb-0">Product Management</h2>
@@ -25,12 +32,12 @@ include 'header.php';
                             }
                             $notificationCount = $notifications->num_rows;
                             if ($notificationCount > 0): ?>
-                                <span class="position-absolute top-0 start-100 translate-middle badge bg-danger rounded-pill" style="font-size: 0.7rem;">
+                                <span class="position-absolute top-0 start-100 translate-middle badge bg-danger rounded-pill" style="font-size: 0.7rem;" id="notificationCount">
                                     <?php echo $notificationCount; ?>
                                 </span>
                             <?php endif; ?>
                         </button>
-                        <div class="dropdown-menu dropdown-menu-end p-0" aria-labelledby="notificationDropdown" style="width: 300px; max-height: 400px; overflow-y: auto;">
+                        <div class="dropdown-menu dropdown-menu-end p-0" aria-labelledby="notificationDropdown" style="width: 300px; max-height: 400px; overflow-y: auto;" id="notificationMenu">
                             <div class="d-flex justify-content-between align-items-center p-2 bg-light">
                                 <h6 class="m-0">Notifications</h6>
                                 <?php if ($notificationCount > 0): ?>
@@ -53,6 +60,7 @@ include 'header.php';
                     </div>
                 </div>
                 <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addProductModal">Add Product</button>
+                <button class="btn btn-secondary ms-2" id="refreshNotifications">Refresh</button>
             </div>
         </div>
         <div class="card-body">
@@ -73,6 +81,7 @@ include 'header.php';
                     $result = $conn->query($sql);
                     while ($product = $result->fetch_assoc()): 
                         $isLowStock = $product['quantity'] <= 10;
+                        $isOutOfStock = $product['quantity'] <= 0;
                     ?>
                         <tr>
                             <td><?php echo $product['product_id']; ?></td>
@@ -80,7 +89,9 @@ include 'header.php';
                             <td><?php echo number_format($product['price'], 2); ?></td>
                             <td><?php echo $product['quantity']; ?></td>
                             <td>
-                                <?php if ($isLowStock): ?>
+                                <?php if ($isOutOfStock): ?>
+                                    <span class="badge badge-out-stock">Out of Stock</span>
+                                <?php elseif ($isLowStock): ?>
                                     <span class="badge badge-low-stock">Low Stock</span>
                                 <?php else: ?>
                                     <span class="badge badge-in-stock">In Stock</span>
@@ -98,7 +109,6 @@ include 'header.php';
         </div>
     </div>
 
-    <!-- Add Product Modal -->
     <div class="modal fade" id="addProductModal" tabindex="-1" aria-labelledby="addProductModalLabel" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">
@@ -118,7 +128,7 @@ include 'header.php';
                         </div>
                         <div class="mb-3">
                             <label for="quantity" class="form-label">Quantity</label>
-                            <input type="number" class="form-control" id="quantity" name="quantity" required>
+                            <input type="number" class="form-control" id="quantity" name="quantity" required min="0">
                         </div>
                     </div>
                     <div class="modal-footer">
@@ -130,7 +140,6 @@ include 'header.php';
         </div>
     </div>
 
-    <!-- Edit Product Modal -->
     <div class="modal fade" id="editProductModal" tabindex="-1" aria-labelledby="editProductModalLabel" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">
@@ -151,7 +160,7 @@ include 'header.php';
                         </div>
                         <div class="mb-3">
                             <label for="edit_quantity" class="form-label">Quantity</label>
-                            <input type="number" class="form-control" id="edit_quantity" name="quantity" required>
+                            <input type="number" class="form-control" id="edit_quantity" name="quantity" required min="0">
                         </div>
                     </div>
                     <div class="modal-footer">
@@ -163,7 +172,6 @@ include 'header.php';
         </div>
     </div>
 
-    <!-- Receive Stock Modal -->
     <div class="modal fade" id="receiveStockModal" tabindex="-1" aria-labelledby="receiveStockModalLabel" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">
@@ -189,6 +197,7 @@ include 'header.php';
     </div>
 </div>
 
+<script src="https://code.jquery.com/jquery-3.6.0.min.js" integrity="sha256-/xUj+3OJU5yExlq6GSYGSHk7tPXikynS7ogEvDej/m4=" crossorigin="anonymous"></script>
 <script>
 $(document).ready(function() {
     $('#editProductModal').on('show.bs.modal', function (event) {
@@ -217,9 +226,65 @@ $(document).ready(function() {
         $('#receive_product_id').val(productId);
     });
 
-    $('#notificationDropdown').on('click', function() {
-        console.log('Notification dropdown clicked');
+    // Function to update notifications
+    function updateNotifications() {
+        $.ajax({
+            url: 'get_notifications.php',
+            type: 'GET',
+            dataType: 'json',
+            success: function(data) {
+                if (data.success) {
+                    var notificationCount = data.count;
+                    var notifications = data.notifications;
+                    var $bell = $('#notificationDropdown');
+                    var $badge = $('#notificationCount');
+                    var $menu = $('#notificationMenu');
+
+                    // Update bell badge
+                    if (notificationCount > 0) {
+                        if ($badge.length) {
+                            $badge.text(notificationCount);
+                        } else {
+                            $bell.append('<span class="position-absolute top-0 start-100 translate-middle badge bg-danger rounded-pill" style="font-size: 0.7rem;" id="notificationCount">' + notificationCount + '</span>');
+                        }
+                    } else {
+                        $badge.remove();
+                    }
+
+                    // Update dropdown menu
+                    var menuContent = '<div class="d-flex justify-content-between align-items-center p-2 bg-light">' +
+                                    '<h6 class="m-0">Notifications</h6>' +
+                                    (notificationCount > 0 ? '<a href="mark_all_read.php" class="btn btn-sm btn-link">Mark all as read</a>' : '') +
+                                    '</div><hr class="dropdown-divider m-0">';
+                    
+                    if (notificationCount > 0) {
+                        notifications.forEach(function(notif) {
+                            menuContent += '<a class="dropdown-item py-2 border-bottom" href="mark_read.php?id=' + notif.notification_id + '">' +
+                                         '<div class="small text-muted">' + new Date(notif.created_at).toLocaleString('en-US', {month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'}) + '</div>' +
+                                         '<div><strong>Low Stock Alert:</strong> ' + notif.message + '</div>' +
+                                         '<div class="small">Current Quantity: ' + notif.current_quantity + '</div>' +
+                                         '</a>';
+                        });
+                    } else {
+                        menuContent += '<div class="p-3 text-center text-muted">No new notifications</div>';
+                    }
+                    $menu.html(menuContent);
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error('Notification Update Error: ' + error);
+            }
+        });
+    }
+
+    // Manual refresh button
+    $('#refreshNotifications').on('click', function() {
+        updateNotifications();
+        location.reload(); // Refresh the whole page to update product quantities too
     });
+
+    // Initial update
+    updateNotifications();
 });
 </script>
 
@@ -246,6 +311,12 @@ $(document).ready(function() {
     }
     .badge-in-stock {
         background-color: #28a745;
+        color: #fff;
+        padding: 5px 10px;
+        border-radius: 12px;
+    }
+    .badge-out-stock {
+        background-color: #6c757d;
         color: #fff;
         padding: 5px 10px;
         border-radius: 12px;
