@@ -1,8 +1,8 @@
 <?php
 session_start();
-// Redirect to dashboard if already logged in
+// Redirect to loading page if already logged in
 if (isset($_SESSION['user_id'])) {
-    header("Location: dashboard.php");
+    header("Location: loading.php");
     exit();
 }
 include 'header.php';
