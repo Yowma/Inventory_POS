@@ -67,10 +67,11 @@ $company_result = $conn->query($company_sql);
                             <div class="col-md-3 product-item <?php echo $product['quantity'] <= 0 ? 'out-of-stock' : ''; ?>" 
                                  data-id="<?php echo $product['product_id']; ?>" 
                                  data-name="<?php echo htmlspecialchars($product['name']); ?>" 
+                                 data-default-price="<?php echo $product['price']; ?>"
                                  data-price="<?php echo $product['price']; ?>"
                                  data-quantity="<?php echo $product['quantity']; ?>">
                                 <h5><?php echo htmlspecialchars($product['name']); ?></h5>
-                                <p>$<?php echo number_format($product['price'], 2); ?></p>
+                                <p>$<span class="price-display"><?php echo number_format($product['price'], 2); ?></span></p>
                                 <p>Stock: <?php echo $product['quantity']; ?></p>
                             </div>
                         <?php endwhile; ?>
@@ -108,11 +109,39 @@ $company_result = $conn->query($company_sql);
         </div>
     </div>
 
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js" integrity="sha256-/xUj+3OJU5yExlq6GSYGSHk7tPXikynS7ogEvDej/m4=" crossorigin="anonymous"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script>
     $(document).ready(function() {
         var cart = [];
-        
+
+        $('#company_select').on('change', function() {
+            var company_id = $(this).val();
+            if (company_id) {
+                $.ajax({
+                    url: 'fetch_prices.php',
+                    type: 'POST',
+                    data: { company_id: company_id },
+                    dataType: 'json',
+                    success: function(response) {
+                        if (response.success) {
+                            $('.product-item').each(function() {
+                                var productId = $(this).data('id');
+                                var newPrice = response.prices[productId] || $(this).data('default-price');
+                                $(this).data('price', newPrice);
+                                $(this).find('.price-display').text(parseFloat(newPrice).toFixed(2));
+                            });
+                            updateCart();
+                        } else {
+                            alert('Error fetching prices: ' + response.error);
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        alert('AJAX error: ' + error);
+                    }
+                });
+            }
+        });
+
         $('.product-item').on('click', function() {
             if ($(this).hasClass('out-of-stock')) {
                 alert('This product is out of stock');
@@ -205,7 +234,7 @@ $company_result = $conn->query($company_sql);
                 success: function(response) {
                     if (response.success) {
                         alert('Sale processed successfully');
-                        generateReceipt(response);
+                        generateReceipt(response); // Call the receipt function
                         cart = [];
                         updateCart();
                         $('#company_select').val('');
@@ -308,14 +337,11 @@ $company_result = $conn->query($company_sql);
                             <p><strong>SOLD TO:</strong> ${data.company.name || 'N/A'}</p>
                             <p><strong>ADDRESS:</strong> ${data.company.address || 'N/A'}</p>
                             <p><strong>TIN:</strong> ${data.company.tin_no || 'N/A'}</p>
-                            <p><strong>CONTACT:</strong> ${data.company.contact_person || 'N/A'}</p>
-                            <p><strong>BUS. STYLE:</strong> ${data.company.business_style || 'N/A'}</p>
                         </div>
                         <div>
                             <p><strong>DATE:</strong> ${currentDate}</p>
-                            <p><strong>TERMS:</strong> December 19, 2024</p>
-                            <p><strong>PO NO.:</strong> 7356</p>
-                            <p><strong>SALE-VAG:</strong> PROJECT NAMES</p>
+                            <p><strong>TERMS:</strong> Due on Receipt</p>
+                            <p><strong>PO NO.:</strong> N/A</p>
                         </div>
                     </div>
                     <table class="receipt-table">
@@ -356,7 +382,6 @@ $company_result = $conn->query($company_sql);
                         <div>
                             <p><strong>PREPARED BY:</strong></p>
                             <p>_________________________</p>
-                            <p>Noted by: / VAG</p>
                         </div>
                         <div>
                             <p><strong>RECEIVED the goods in good condition:</strong></p>
@@ -365,7 +390,7 @@ $company_result = $conn->query($company_sql);
                         </div>
                         <div>
                             <p><strong>CONDITIONS:</strong></p>
-                            <p>Buyer expressly submit themselves to the jurisdiction of the courts of Mandaluyong City in any legal action arising out of this transaction. Interest at 20% per annum will be charged on all overdue accounts plus 25% for attorney's fees in case collection is made thru the attorney.</p>
+                            <p>Buyer expressly submits to the jurisdiction of the courts of Mandaluyong City in any legal action arising out of this transaction.</p>
                         </div>
                     </div>
                 </div>

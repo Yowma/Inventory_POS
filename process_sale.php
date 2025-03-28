@@ -51,7 +51,6 @@ $stmt->close();
 
 $conn->begin_transaction();
 try {
-    // Validate stock and check for low stock
     $lowStockThreshold = 10;
     $notificationStmt = $conn->prepare("INSERT INTO notifications (product_id, message, current_quantity, created_at) 
                                       VALUES (?, ?, ?, NOW()) 
@@ -69,7 +68,6 @@ try {
             throw new Exception("Insufficient stock for product ID: " . $item['id']);
         }
 
-        // Check if quantity will fall below threshold after sale
         $newQuantity = $product['quantity'] - $item['quantity'];
         if ($newQuantity <= $lowStockThreshold && $newQuantity >= 0) {
             $message = "Product '" . $product['name'] . "' is running low on stock.";
@@ -78,11 +76,10 @@ try {
         }
     }
 
-    // Insert sale record
     $user_id = $_SESSION['user_id'];
     $total_amount = 0;
     foreach ($cart as $item) {
-        $total_amount += $item['price'] * $item['quantity'];
+        $total_amount += $item['price'] * $item['quantity']; // Use price from cart (company-specific)
     }
 
     $stmt = $conn->prepare("INSERT INTO sales (user_id, company_id, sale_date, total_amount) VALUES (?, ?, NOW(), ?)");
@@ -91,14 +88,13 @@ try {
     $sale_id = $conn->insert_id;
     $stmt->close();
 
-    // Insert sale items and update quantities
     $stmt = $conn->prepare("INSERT INTO sales_items (sale_id, product_id, quantity, price) VALUES (?, ?, ?, ?)");
     $updateStmt = $conn->prepare("UPDATE products SET quantity = quantity - ? WHERE product_id = ?");
     
     foreach ($cart as $item) {
         $product_id = $item['id'];
         $quantity = $item['quantity'];
-        $price = $item['price'];
+        $price = $item['price']; // Use the company-specific price from cart
 
         $stmt->bind_param("iiid", $sale_id, $product_id, $quantity, $price);
         $stmt->execute();
@@ -112,7 +108,6 @@ try {
 
     $conn->commit();
 
-    // Set session variable to trigger refresh in products.php
     $_SESSION['refresh_products'] = true;
 
     echo json_encode([
