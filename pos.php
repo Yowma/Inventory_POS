@@ -4,7 +4,7 @@ if (!isset($_SESSION['user_id'])) header("Location: login.php");
 include 'db.php';
 include 'header.php';
 
-$sql = "SELECT * FROM products";
+$sql = "SELECT product_id, name, description, quantity FROM products";
 $result = $conn->query($sql);
 
 $company_sql = "SELECT * FROM companies ORDER BY name";
@@ -53,6 +53,10 @@ $company_result = $conn->query($company_sql);
             cursor: not-allowed;
             opacity: 0.6;
         }
+        .price-display {
+            font-weight: bold;
+            color: #28a745;
+        }
     </style>
 </head>
 <body>
@@ -66,12 +70,11 @@ $company_result = $conn->query($company_sql);
                         <?php while ($product = $result->fetch_assoc()): ?>
                             <div class="col-md-3 product-item <?php echo $product['quantity'] <= 0 ? 'out-of-stock' : ''; ?>" 
                                  data-id="<?php echo $product['product_id']; ?>" 
-                                 data-name="<?php echo htmlspecialchars($product['name']); ?>" 
-                                 data-default-price="<?php echo $product['price']; ?>"
-                                 data-price="<?php echo $product['price']; ?>"
+                                 data-name="<?php echo htmlspecialchars($product['name']); ?>"
                                  data-quantity="<?php echo $product['quantity']; ?>">
                                 <h5><?php echo htmlspecialchars($product['name']); ?></h5>
-                                <p>$<span class="price-display"><?php echo number_format($product['price'], 2); ?></span></p>
+                                <p><?php echo htmlspecialchars($product['description'] ?? 'No description'); ?></p>
+                                <p>Price: $<span class="price-display">0.00</span></p>
                                 <p>Stock: <?php echo $product['quantity']; ?></p>
                             </div>
                         <?php endwhile; ?>
@@ -114,6 +117,19 @@ $company_result = $conn->query($company_sql);
     $(document).ready(function() {
         var cart = [];
 
+        // Function to update product prices display
+        function updateProductPrices(prices) {
+            $('.product-item').each(function() {
+                var productId = $(this).data('id');
+                var price = prices[productId] !== undefined ? parseFloat(prices[productId]) : 0;
+                if (isNaN(price)) price = 0; // Ensure price is a valid number
+                $(this).data('price', price);
+                $(this).find('.price-display').text(price.toFixed(2));
+            });
+            updateCart(); // Update cart prices if items exist
+        }
+
+        // Company selection handler
         $('#company_select').on('change', function() {
             var company_id = $(this).val();
             if (company_id) {
@@ -124,36 +140,56 @@ $company_result = $conn->query($company_sql);
                     dataType: 'json',
                     success: function(response) {
                         if (response.success) {
-                            $('.product-item').each(function() {
-                                var productId = $(this).data('id');
-                                var newPrice = response.prices[productId] || $(this).data('default-price');
-                                $(this).data('price', newPrice);
-                                $(this).find('.price-display').text(parseFloat(newPrice).toFixed(2));
-                            });
-                            updateCart();
+                            console.log('Prices fetched:', response.prices); // Debug log
+                            updateProductPrices(response.prices);
                         } else {
                             alert('Error fetching prices: ' + response.error);
+                            $('#company_select').val(''); // Reset selection on error
+                            updateProductPrices({}); // Reset prices
                         }
                     },
                     error: function(xhr, status, error) {
+                        console.error('AJAX error:', error, xhr.responseText); // Debug log
                         alert('AJAX error: ' + error);
+                        $('#company_select').val(''); // Reset selection on error
+                        updateProductPrices({}); // Reset prices
                     }
                 });
+            } else {
+                // Reset prices to 0 when no company is selected
+                updateProductPrices({});
             }
         });
 
+        // Product click handler
         $('.product-item').on('click', function() {
             if ($(this).hasClass('out-of-stock')) {
                 alert('This product is out of stock');
                 return;
             }
             
+            var company_id = $('#company_select').val();
+            if (!company_id) {
+                alert('Please select a company first');
+                return;
+            }
+
             var id = $(this).data('id');
             var name = $(this).data('name');
             var price = parseFloat($(this).data('price'));
             var availableQty = parseInt($(this).data('quantity'));
-            
-            var existing = cart.find(item => item.id == id);
+
+            if (isNaN(price)) {
+                alert('Invalid price for this product');
+                return;
+            }
+
+            if (price === 0) {
+                alert('This product has a price of $0.00. Please set a price for this product in the price configuration.');
+                return;
+            }
+
+            var existing = cart.find(item => item.id === id);
             if (existing) {
                 if (existing.quantity + 1 > availableQty) {
                     alert('Not enough stock available');
@@ -170,17 +206,21 @@ $company_result = $conn->query($company_sql);
             updateCart();
         });
 
+        // Update cart display
         function updateCart() {
             var cartHtml = '';
             var total = 0;
             cart.forEach(function(item) {
-                var subtotal = item.price * item.quantity;
+                var price = parseFloat(item.price);
+                if (isNaN(price)) price = 0; // Ensure price is valid
+                var subtotal = price * item.quantity;
+                if (isNaN(subtotal)) subtotal = 0; // Ensure subtotal is valid
                 total += subtotal;
                 cartHtml += `<tr>
                     <td>${item.name}</td>
                     <td><input type="number" class="form-control quantity" data-id="${item.id}" value="${item.quantity}" min="1" max="${item.availableQty}"></td>
-                    <td>${item.price.toFixed(2)}</td>
-                    <td>${subtotal.toFixed(2)}</td>
+                    <td>$${price.toFixed(2)}</td>
+                    <td>$${subtotal.toFixed(2)}</td>
                     <td><button class="btn btn-danger btn-sm remove-item" data-id="${item.id}">Remove</button></td>
                 </tr>`;
             });
@@ -188,10 +228,11 @@ $company_result = $conn->query($company_sql);
             $('#total_amount').text(total.toFixed(2));
         }
 
+        // Quantity change handler
         $(document).on('change', '.quantity', function() {
             var id = $(this).data('id');
             var qty = parseInt($(this).val()) || 1;
-            var item = cart.find(item => item.id == id);
+            var item = cart.find(item => item.id === id);
             if (item) {
                 if (qty > item.availableQty) {
                     alert('Quantity exceeds available stock');
@@ -207,12 +248,14 @@ $company_result = $conn->query($company_sql);
             }
         });
 
+        // Remove item handler
         $(document).on('click', '.remove-item', function() {
             var id = $(this).data('id');
-            cart = cart.filter(item => item.id != id);
+            cart = cart.filter(item => item.id !== id);
             updateCart();
         });
 
+        // Finalize sale handler
         $('#finalize_sale').on('click', function() {
             if (cart.length === 0) {
                 alert('Cart is empty');
@@ -234,7 +277,7 @@ $company_result = $conn->query($company_sql);
                 success: function(response) {
                     if (response.success) {
                         alert('Sale processed successfully');
-                        generateReceipt(response); // Call the receipt function
+                        generateReceipt(response);
                         cart = [];
                         updateCart();
                         $('#company_select').val('');
@@ -249,6 +292,7 @@ $company_result = $conn->query($company_sql);
             });
         });
 
+        // Receipt generation
         function generateReceipt(data) {
             const vatRate = 0.12;
             const totalAmount = parseFloat(data.total_amount);

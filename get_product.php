@@ -2,7 +2,7 @@
 include 'db.php';
 if (isset($_GET['id'])) {
     $product_id = $_GET['id'];
-    $sql = "SELECT * FROM Products WHERE product_id = ?";
+    $sql = "SELECT product_id, name, description, quantity FROM Products WHERE product_id = ?";
     $stmt = $conn->prepare($sql);
     $stmt->bind_param("i", $product_id);
     $stmt->execute();

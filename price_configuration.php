@@ -109,34 +109,32 @@ if (isset($_POST['company_id'])) {
                 </select>
             </div>
             <div class="price-list">
-                <?php 
-                $product_result->data_seek(0);
-                while ($product = $product_result->fetch_assoc()): 
-                    $product_id = $product['product_id'];
-                    $current_price = isset($current_prices[$product_id]) ? $current_prices[$product_id] : null;
-                ?>
-                    <div class="price-item">
-                        <div class="d-flex align-items-center">
-                            <i class="fas fa-box me-3 text-muted"></i>
-                            <div>
-                                <label class="product-name"><?php echo htmlspecialchars($product['name']); ?></label>
-                                <p class="current-price text-muted mb-0">
-                                    <?php if ($current_price !== null): ?>
-                                        Current: $<?php echo number_format($current_price, 2); ?>
-                                    <?php else: ?>
-                                        Default: $<?php echo number_format($product['price'], 2); ?>
-                                    <?php endif; ?>
-                                </p>
-                            </div>
-                        </div>
-                        <input type="number" step="0.01" min="0" 
-                               name="prices[<?php echo $product['product_id']; ?>]" 
-                               class="form-control custom-price" 
-                               placeholder="Custom Price"
-                               value="<?php echo $current_price !== null ? $current_price : ''; ?>">
-                    </div>
-                <?php endwhile; ?>
+    <?php 
+    $product_result->data_seek(0);
+    while ($product = $product_result->fetch_assoc()): 
+        $product_id = $product['product_id'];
+        $current_price = isset($current_prices[$product_id]) ? $current_prices[$product_id] : null;
+    ?>
+        <div class="price-item">
+            <div class="d-flex align-items-center">
+                <i class="fas fa-box me-3 text-muted"></i>
+                <div>
+                    <label class="product-name"><?php echo htmlspecialchars($product['name']); ?></label>
+                    <?php if ($current_price !== null): ?>
+                        <p class="current-price text-muted mb-0">
+                            Current: $<?php echo number_format($current_price, 2); ?>
+                        </p>
+                    <?php endif; ?>
+                </div>
             </div>
+            <input type="number" step="0.01" min="0" 
+                   name="prices[<?php echo $product['product_id']; ?>]" 
+                   class="form-control custom-price" 
+                   placeholder="Custom Price"
+                   value="<?php echo $current_price !== null ? $current_price : ''; ?>">
+        </div>
+    <?php endwhile; ?>
+</div>
             <button type="submit" name="update_prices" class="btn btn-success">Update Prices</button>
         </form>
     </div>

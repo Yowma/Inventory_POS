@@ -29,8 +29,9 @@ if (json_last_error() !== JSON_ERROR_NONE || empty($cart)) {
     exit;
 }
 
+// Modified validation to remove price check
 foreach ($cart as $item) {
-    if (!isset($item['id'], $item['price'], $item['quantity'], $item['availableQty'])) {
+    if (!isset($item['id'], $item['quantity'], $item['availableQty'])) {
         echo json_encode(['success' => false, 'error' => 'Invalid cart item']);
         exit;
     }
@@ -78,8 +79,9 @@ try {
 
     $user_id = $_SESSION['user_id'];
     $total_amount = 0;
+    // Modified to use company-specific prices from the cart
     foreach ($cart as $item) {
-        $total_amount += $item['price'] * $item['quantity']; // Use price from cart (company-specific)
+        $total_amount += $item['price'] * $item['quantity'];
     }
 
     $stmt = $conn->prepare("INSERT INTO sales (user_id, company_id, sale_date, total_amount) VALUES (?, ?, NOW(), ?)");
@@ -94,7 +96,7 @@ try {
     foreach ($cart as $item) {
         $product_id = $item['id'];
         $quantity = $item['quantity'];
-        $price = $item['price']; // Use the company-specific price from cart
+        $price = $item['price']; // Still needed for sales_items table
 
         $stmt->bind_param("iiid", $sale_id, $product_id, $quantity, $price);
         $stmt->execute();

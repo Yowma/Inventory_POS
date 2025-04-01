@@ -69,7 +69,7 @@ include 'header.php';
                     <tr>
                         <th>ID</th>
                         <th>Name</th>
-                        <th>Price</th>
+                        <th>Description</th>
                         <th>Quantity</th>
                         <th>Status</th>
                         <th>Actions</th>
@@ -86,7 +86,7 @@ include 'header.php';
                         <tr>
                             <td><?php echo $product['product_id']; ?></td>
                             <td><?php echo $product['name']; ?></td>
-                            <td><?php echo number_format($product['price'], 2); ?></td>
+                            <td><?php echo htmlspecialchars($product['description'] ?? 'No description'); ?></td>
                             <td><?php echo $product['quantity']; ?></td>
                             <td>
                                 <?php if ($isOutOfStock): ?>
@@ -123,8 +123,8 @@ include 'header.php';
                             <input type="text" class="form-control" id="name" name="name" required>
                         </div>
                         <div class="mb-3">
-                            <label for="price" class="form-label">Price</label>
-                            <input type="number" step="0.01" class="form-control" id="price" name="price" required>
+                            <label for="description" class="form-label">Description</label>
+                            <textarea class="form-control" id="description" name="description" rows="3"></textarea>
                         </div>
                         <div class="mb-3">
                             <label for="quantity" class="form-label">Quantity</label>
@@ -155,8 +155,8 @@ include 'header.php';
                             <input type="text" class="form-control" id="edit_name" name="name" required>
                         </div>
                         <div class="mb-3">
-                            <label for="edit_price" class="form-label">Price</label>
-                            <input type="number" step="0.01" class="form-control" id="edit_price" name="price" required>
+                            <label for="edit_description" class="form-label">Description</label>
+                            <textarea class="form-control" id="edit_description" name="description" rows="3"></textarea>
                         </div>
                         <div class="mb-3">
                             <label for="edit_quantity" class="form-label">Quantity</label>
@@ -210,7 +210,7 @@ $(document).ready(function() {
             success: function(data) {
                 $('#edit_product_id').val(data.product_id);
                 $('#edit_name').val(data.name);
-                $('#edit_price').val(data.price);
+                $('#edit_description').val(data.description || '');
                 $('#edit_quantity').val(data.quantity);
             },
             error: function(xhr, status, error) {

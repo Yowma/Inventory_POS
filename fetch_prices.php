@@ -10,10 +10,11 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !isset($_POST['company_id'])) {
 
 $company_id = (int)$_POST['company_id'];
 
+// Modified query to get prices only from company_product_prices
 $stmt = $conn->prepare("
-    SELECT p.product_id, COALESCE(cpp.price, p.price) AS price
-    FROM products p
-    LEFT JOIN company_product_prices cpp ON p.product_id = cpp.product_id AND cpp.company_id = ?
+    SELECT cpp.product_id, cpp.price
+    FROM company_product_prices cpp
+    WHERE cpp.company_id = ?
 ");
 $stmt->bind_param("i", $company_id);
 $stmt->execute();
