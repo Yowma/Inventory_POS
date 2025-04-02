@@ -2,26 +2,22 @@
 session_start();
 require_once 'db.php';
 
-// Check if user is logged in
 if (!isset($_SESSION['user_id'])) {
     header("Location: login.php");
     exit;
 }
 
-// Initialize variables for messages
 $success_message = '';
 $error_messages = [];
 
-// Handle form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_prices']) && isset($_POST['company_id'])) {
     $company_id = $_POST['company_id'];
     $prices = $_POST['prices'];
     $all_valid = true;
 
-    // Validate each price
     foreach ($prices as $product_id => $price) {
         if ($price === '' || $price === null) {
-            continue; // Skip empty prices (they won't be updated)
+            continue;
         }
         if (!is_numeric($price) || $price < 0) {
             $all_valid = false;
@@ -29,11 +25,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_prices']) && i
         }
     }
 
-    // If all prices are valid, update the database
     if ($all_valid) {
         foreach ($prices as $product_id => $price) {
             if ($price === '' || $price === null) {
-                continue; // Skip empty prices
+                continue;
             }
             $stmt = $conn->prepare("
                 INSERT INTO company_product_prices (company_id, product_id, price) 
@@ -50,13 +45,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_prices']) && i
 
 include 'header.php';
 
-$product_sql = "SELECT * FROM products";
+$model_sql = "SELECT model_id, name FROM models ORDER BY name";
+$model_result = $conn->query($model_sql);
+
+$product_sql = "SELECT p.product_id, p.name, p.price AS default_price, m.model_id, m.name AS model_name 
+                FROM products p 
+                LEFT JOIN models m ON p.model_id = m.model_id";
 $product_result = $conn->query($product_sql);
 
 $company_sql = "SELECT * FROM companies ORDER BY name";
 $company_result = $conn->query($company_sql);
 
-// Fetch current prices for the selected company (if any)
 $current_prices = [];
 if (isset($_POST['company_id'])) {
     $company_id = $_POST['company_id'];
@@ -95,50 +94,69 @@ if (isset($_POST['company_id'])) {
     <?php endif; ?>
     <div class="card p-4">
         <form method="POST" action="" id="priceForm">
-            <div class="mb-4">
-                <label for="company_select" class="form-label">Select Company</label>
-                <select class="form-select" id="company_select" name="company_id" required onchange="this.form.submit()">
-                    <option value="" disabled <?php echo !isset($_POST['company_id']) ? 'selected' : ''; ?>>Choose a company</option>
-                    <?php 
-                    $company_result->data_seek(0);
-                    while ($company = $company_result->fetch_assoc()): ?>
-                        <option value="<?php echo $company['company_id']; ?>" <?php echo isset($_POST['company_id']) && $_POST['company_id'] == $company['company_id'] ? 'selected' : ''; ?>>
-                            <?php echo htmlspecialchars($company['name']); ?>
-                        </option>
-                    <?php endwhile; ?>
-                </select>
-            </div>
-            <div class="price-list">
-    <?php 
-    $product_result->data_seek(0);
-    while ($product = $product_result->fetch_assoc()): 
-        $product_id = $product['product_id'];
-        $current_price = isset($current_prices[$product_id]) ? $current_prices[$product_id] : null;
-    ?>
-        <div class="price-item">
-            <div class="d-flex align-items-center">
-                <i class="fas fa-box me-3 text-muted"></i>
-                <div>
-                    <label class="product-name"><?php echo htmlspecialchars($product['name']); ?></label>
-                    <?php if ($current_price !== null): ?>
-                        <p class="current-price text-muted mb-0">
-                            Current: $<?php echo number_format($current_price, 2); ?>
-                        </p>
-                    <?php endif; ?>
+            <div class="mb-4 row">
+                <div class="col-md-6">
+                    <label for="company_select" class="form-label">Select Company</label>
+                    <select class="form-select" id="company_select" name="company_id" required onchange="this.form.submit()">
+                        <option value="" disabled <?php echo !isset($_POST['company_id']) ? 'selected' : ''; ?>>Choose a company</option>
+                        <?php 
+                        $company_result->data_seek(0);
+                        while ($company = $company_result->fetch_assoc()): ?>
+                            <option value="<?php echo $company['company_id']; ?>" <?php echo isset($_POST['company_id']) && $_POST['company_id'] == $company['company_id'] ? 'selected' : ''; ?>>
+                                <?php echo htmlspecialchars($company['name']); ?>
+                            </option>
+                        <?php endwhile; ?>
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <label for="model_filter" class="form-label">Filter by Model</label>
+                    <select class="form-select" id="model_filter">
+                        <option value="">All Models</option>
+                        <?php 
+                        $model_result->data_seek(0);
+                        while ($model = $model_result->fetch_assoc()): ?>
+                            <option value="<?php echo $model['model_id']; ?>">
+                                <?php echo htmlspecialchars($model['name']); ?>
+                            </option>
+                        <?php endwhile; ?>
+                    </select>
                 </div>
             </div>
-            <input type="number" step="0.01" min="0" 
-                   name="prices[<?php echo $product['product_id']; ?>]" 
-                   class="form-control custom-price" 
-                   placeholder="Custom Price"
-                   value="<?php echo $current_price !== null ? $current_price : ''; ?>">
-        </div>
-    <?php endwhile; ?>
-</div>
+            <div class="price-list">
+                <?php 
+                $product_result->data_seek(0);
+                while ($product = $product_result->fetch_assoc()): 
+                    $product_id = $product['product_id'];
+                    $default_price = $product['default_price'];
+                    $current_price = isset($current_prices[$product_id]) ? $current_prices[$product_id] : $default_price;
+                ?>
+                    <div class="price-item" data-model-id="<?php echo $product['model_id']; ?>">
+                        <div class="d-flex align-items-center">
+                            <i class="fas fa-box me-3 text-muted"></i>
+                            <div>
+                                <label class="product-name"><?php echo htmlspecialchars($product['name']); ?></label>
+                                <p class="current-price text-muted mb-0">
+                                    Model: <?php echo htmlspecialchars($product['model_name'] ?? 'No Model'); ?>
+                                    | Default: $<?php echo number_format($default_price, 2); ?>
+                                    <?php if (isset($current_prices[$product_id])): ?>
+                                        | Current: $<?php echo number_format($current_prices[$product_id], 2); ?>
+                                    <?php endif; ?>
+                                </p>
+                            </div>
+                        </div>
+                        <input type="number" step="0.01" min="0" 
+                               name="prices[<?php echo $product['product_id']; ?>]" 
+                               class="form-control custom-price" 
+                               placeholder="Custom Price"
+                               value="<?php echo $current_price !== null ? $current_price : ''; ?>">
+                    </div>
+                <?php endwhile; ?>
+            </div>
             <button type="submit" name="update_prices" class="btn btn-success">Update Prices</button>
         </form>
     </div>
 </div>
+
 <style>
     .card {
         border-radius: 12px;
@@ -208,7 +226,7 @@ if (isset($_POST['company_id'])) {
     }
     @media (max-width: 768px) {
         .price-list {
-            max-width: 100%; /* Full width on mobile */
+            max-width: 100%;
         }
         .price-item {
             flex-direction: column;
@@ -234,21 +252,36 @@ if (isset($_POST['company_id'])) {
 <script src="https://code.jquery.com/jquery-3.5.1.min.js" integrity="sha256-9/aliU8dGd2tb6OSsuzixeV4y/faTqgFtohetphbbj0=" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js" integrity="sha384-geWF76RCwLtnZ8qwWowPQNguL3RmwHVBC9FhGdlKrxdiJJigb/j/68SIy3Te4Bkz" crossorigin="anonymous"></script>
 <script>
-    // Ensure dropdown works on click
     $(document).ready(function() {
+        function filterProductsByModel(modelId) {
+            $('.price-item').each(function() {
+                var productModelId = $(this).data('model-id');
+                if (modelId === '' || productModelId == modelId) {
+                    $(this).show();
+                } else {
+                    $(this).hide();
+                }
+            });
+        }
+
+        $('#model_filter').on('change', function() {
+            var modelId = $(this).val();
+            filterProductsByModel(modelId);
+        });
+
+        filterProductsByModel('');
+
         $('.dropdown-toggle').on('click', function(e) {
             e.preventDefault();
             $(this).next('.dropdown-menu').toggleClass('show');
         });
 
-        // Close dropdown when clicking outside
         $(document).on('click', function(e) {
             if (!$(e.target).closest('.dropdown').length) {
                 $('.dropdown-menu').removeClass('show');
             }
         });
 
-        // Client-side validation
         $('#priceForm').on('submit', function(e) {
             let hasErrors = false;
             $('.custom-price').each(function() {
@@ -267,7 +300,6 @@ if (isset($_POST['company_id'])) {
             }
         });
 
-        // Remove is-invalid class when user corrects the input
         $('.custom-price').on('input', function() {
             const price = $(this).val();
             if (price === '' || (!isNaN(price) && parseFloat(price) >= 0)) {
@@ -277,7 +309,7 @@ if (isset($_POST['company_id'])) {
     });
 </script>
 
-</div> <!-- Close main-content -->
+</div>
 </body>
 </html>
 <?php 

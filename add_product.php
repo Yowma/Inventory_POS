@@ -5,13 +5,12 @@ include 'db.php';
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $name = $_POST['name'];
-    $model_id = $_POST['model_id'] ?: null;
-    $category_id = $_POST['category_id'] ?: null;
+    $model_id = (int)$_POST['model_id'];
     $description = $_POST['description'];
     $price = floatval($_POST['price']);
     
-    $stmt = $conn->prepare("INSERT INTO products (name, model_id, category_id, description, price) VALUES (?, ?, ?, ?, ?)");
-    $stmt->bind_param("siisd", $name, $model_id, $category_id, $description, $price);
+    $stmt = $conn->prepare("INSERT INTO products (name, model_id, description, price) VALUES (?, ?, ?, ?)");
+    $stmt->bind_param("sisd", $name, $model_id, $description, $price);
     $stmt->execute();
     $stmt->close();
     

@@ -4,7 +4,14 @@ if (!isset($_SESSION['user_id'])) header("Location: login.php");
 include 'db.php';
 include 'header.php';
 
-$sql = "SELECT product_id, name, description, quantity FROM products";
+// Fetch all models for the dropdown
+$model_sql = "SELECT model_id, name FROM models ORDER BY name";
+$model_result = $conn->query($model_sql);
+
+// Fetch products with their model details and default prices
+$sql = "SELECT p.product_id, p.name, p.description, p.price AS default_price, m.model_id, m.name AS model_name, m.quantity 
+        FROM products p 
+        LEFT JOIN models m ON p.model_id = m.model_id";
 $result = $conn->query($sql);
 
 $company_sql = "SELECT * FROM companies ORDER BY name";
@@ -57,7 +64,6 @@ $company_result = $conn->query($company_sql);
             font-weight: bold;
             color: #28a745;
         }
-        /* Popup Styling */
         .modal-overlay {
             position: fixed;
             top: 0;
@@ -94,19 +100,34 @@ $company_result = $conn->query($company_sql);
     <div class="main-content">
         <div class="container mt-5">
             <h2>Point of Sale</h2>
+            <div class="row mb-3">
+                <div class="col-md-4">
+                    <label for="model_filter" class="form-label">Filter by Model</label>
+                    <select class="form-select" id="model_filter">
+                        <option value="">All Models</option>
+                        <?php while ($model = $model_result->fetch_assoc()): ?>
+                            <option value="<?php echo $model['model_id']; ?>">
+                                <?php echo htmlspecialchars($model['name']); ?>
+                            </option>
+                        <?php endwhile; ?>
+                    </select>
+                </div>
+            </div>
             <div class="row">
                 <div class="col-md-8">
                     <h4>Product List</h4>
                     <div id="product_list" class="row">
                         <?php while ($product = $result->fetch_assoc()): ?>
-                            <div class="col-md-3 product-item <?php echo $product['quantity'] <= 0 ? 'out-of-stock' : ''; ?>" 
+                            <div class="col-md-3 product-item <?php echo ($product['quantity'] ?? 0) <= 0 ? 'out-of-stock' : ''; ?>" 
                                  data-id="<?php echo $product['product_id']; ?>" 
                                  data-name="<?php echo htmlspecialchars($product['name']); ?>"
-                                 data-quantity="<?php echo $product['quantity']; ?>">
+                                 data-model-id="<?php echo $product['model_id']; ?>"
+                                 data-quantity="<?php echo $product['quantity'] ?? 0; ?>"
+                                 data-default-price="<?php echo $product['default_price']; ?>">
                                 <h5><?php echo htmlspecialchars($product['name']); ?></h5>
-                                <p><?php echo htmlspecialchars($product['description'] ?? 'No description'); ?></p>
-                                <p>Price: $<span class="price-display">0.00</span></p>
-                                <p>Stock: <?php echo $product['quantity']; ?></p>
+                                <p>Model: <?php echo htmlspecialchars($product['model_name'] ?? 'No Model'); ?></p>
+                                <p>Price: ₱<span class="price-display"><?php echo number_format($product['default_price'], 2); ?></span></p>
+                                <p>Stock: <?php echo $product['quantity'] ?? 0; ?></p>
                             </div>
                         <?php endwhile; ?>
                     </div>
@@ -125,7 +146,7 @@ $company_result = $conn->query($company_sql);
                         </thead>
                         <tbody></tbody>
                     </table>
-                    <h5>Total: $<span id="total_amount">0.00</span></h5>
+                    <h5>Total: ₱<span id="total_amount">0.00</span></h5>
                     <div class="mb-3">
                         <label for="company_select" class="form-label">Select Company</label>
                         <select class="form-select" id="company_select" required>
@@ -158,19 +179,41 @@ $company_result = $conn->query($company_sql);
     $(document).ready(function() {
         var cart = [];
 
-        // Function to update product prices display
+        // Function to filter products by model
+        function filterProductsByModel(modelId) {
+            $('.product-item').each(function() {
+                var productModelId = $(this).data('model-id');
+                if (modelId === '' || productModelId == modelId) {
+                    $(this).show();
+                } else {
+                    $(this).hide();
+                }
+            });
+        }
+
+        // Model filter handler
+        $('#model_filter').on('change', function() {
+            var modelId = $(this).val();
+            filterProductsByModel(modelId);
+        });
+
+        // Initial filter (show all)
+        filterProductsByModel('');
+
+        // Update product prices based on company selection or default
         function updateProductPrices(prices) {
             $('.product-item').each(function() {
                 var productId = $(this).data('id');
-                var price = prices[productId] !== undefined ? parseFloat(prices[productId]) : 0;
-                if (isNaN(price)) price = 0;
+                var defaultPrice = parseFloat($(this).data('default-price'));
+                var price = prices[productId] !== undefined ? parseFloat(prices[productId]) : defaultPrice;
+                if (isNaN(price)) price = defaultPrice; // Fallback to default if invalid
                 $(this).data('price', price);
                 $(this).find('.price-display').text(price.toFixed(2));
             });
             updateCart();
         }
 
-        // Company selection handler
+        // Fetch company-specific prices when company is selected
         $('#company_select').on('change', function() {
             var company_id = $(this).val();
             if (company_id) {
@@ -185,27 +228,27 @@ $company_result = $conn->query($company_sql);
                         } else {
                             alert('Error fetching prices: ' + response.error);
                             $('#company_select').val('');
-                            updateProductPrices({});
+                            updateProductPrices({}); // Reset to default prices
                         }
                     },
                     error: function(xhr, status, error) {
                         alert('AJAX error: ' + error);
                         $('#company_select').val('');
-                        updateProductPrices({});
+                        updateProductPrices({}); // Reset to default prices
                     }
                 });
             } else {
-                updateProductPrices({});
+                updateProductPrices({}); // Show default prices when no company is selected
             }
         });
 
-        // Product click handler
+        // Add product to cart
         $('.product-item').on('click', function() {
             if ($(this).hasClass('out-of-stock')) {
                 alert('This product is out of stock');
                 return;
             }
-            
+
             var company_id = $('#company_select').val();
             if (!company_id) {
                 alert('Please select a company first');
@@ -214,6 +257,7 @@ $company_result = $conn->query($company_sql);
 
             var id = $(this).data('id');
             var name = $(this).data('name');
+            var modelId = $(this).data('model-id');
             var price = parseFloat($(this).data('price'));
             var availableQty = parseInt($(this).data('quantity'));
 
@@ -223,23 +267,23 @@ $company_result = $conn->query($company_sql);
             }
 
             if (price === 0) {
-                alert('This product has a price of $0.00. Please set a price.');
+                alert('This product has a price of ₱0.00. Please set a price.');
                 return;
             }
 
             var existing = cart.find(item => item.id === id);
             if (existing) {
                 if (existing.quantity + 1 > availableQty) {
-                    alert('Not enough stock available');
+                    alert('Not enough stock available for this model');
                     return;
                 }
                 existing.quantity += 1;
             } else {
                 if (availableQty < 1) {
-                    alert('Not enough stock available');
+                    alert('Not enough stock available for this model');
                     return;
                 }
-                cart.push({id: id, name: name, price: price, quantity: 1, availableQty: availableQty});
+                cart.push({id: id, name: name, modelId: modelId, price: price, quantity: 1, availableQty: availableQty});
             }
             updateCart();
         });
@@ -257,8 +301,8 @@ $company_result = $conn->query($company_sql);
                 cartHtml += `<tr>
                     <td>${item.name}</td>
                     <td><input type="number" class="form-control quantity" data-id="${item.id}" value="${item.quantity}" min="1" max="${item.availableQty}"></td>
-                    <td>$${price.toFixed(2)}</td>
-                    <td>$${subtotal.toFixed(2)}</td>
+                    <td>₱${price.toFixed(2)}</td>
+                    <td>₱${subtotal.toFixed(2)}</td>
                     <td><button class="btn btn-danger btn-sm remove-item" data-id="${item.id}">Remove</button></td>
                 </tr>`;
             });
@@ -266,14 +310,14 @@ $company_result = $conn->query($company_sql);
             $('#total_amount').text(total.toFixed(2));
         }
 
-        // Quantity change handler
+        // Update quantity in cart
         $(document).on('change', '.quantity', function() {
             var id = $(this).data('id');
             var qty = parseInt($(this).val()) || 1;
             var item = cart.find(item => item.id === id);
             if (item) {
                 if (qty > item.availableQty) {
-                    alert('Quantity exceeds available stock');
+                    alert('Quantity exceeds available stock for this model');
                     $(this).val(item.availableQty);
                     item.quantity = item.availableQty;
                 } else if (qty < 1) {
@@ -286,14 +330,14 @@ $company_result = $conn->query($company_sql);
             }
         });
 
-        // Remove item handler
+        // Remove item from cart
         $(document).on('click', '.remove-item', function() {
             var id = $(this).data('id');
             cart = cart.filter(item => item.id !== id);
             updateCart();
         });
 
-        // Finalize sale handler - Show popup
+        // Finalize sale
         $('#finalize_sale').on('click', function() {
             if (cart.length === 0) {
                 alert('Cart is empty');
@@ -304,12 +348,11 @@ $company_result = $conn->query($company_sql);
                 alert('Please select a company');
                 return;
             }
-            // Show the PO number popup in the middle of the screen
             $('#poModal').css('display', 'block');
             $('#po_number_input').focus();
         });
 
-        // Submit PO number
+        // Submit sale with PO number
         $('#submit_po').on('click', function() {
             var po_number = $('#po_number_input').val().trim();
             if (!po_number) {
@@ -346,13 +389,12 @@ $company_result = $conn->query($company_sql);
             });
         });
 
-        // Cancel PO number input
         $('#cancel_po').on('click', function() {
             $('#poModal').css('display', 'none');
             $('#po_number_input').val('');
         });
 
-        // Receipt generation
+        // Generate receipt
         function generateReceipt(data) {
             const vatRate = 0.12;
             const totalAmount = parseFloat(data.total_amount);
@@ -467,8 +509,8 @@ $company_result = $conn->query($company_sql);
                         <td>${item.quantity}</td>
                         <td>UNITS</td>
                         <td>${item.name}</td>
-                        <td>${item.price.toFixed(2)}</td>
-                        <td>${subtotal.toFixed(2)}</td>
+                        <td>₱${item.price.toFixed(2)}</td>
+                        <td>₱${subtotal.toFixed(2)}</td>
                     </tr>
                 `;
             });
@@ -476,11 +518,11 @@ $company_result = $conn->query($company_sql);
                         </tbody>
                     </table>
                     <div class="receipt-totals">
-                        <p>VAT EXEMPT SALES: ${zeroRatedSales.toFixed(2)}</p>
-                        <p>ZERO RATED SALES: 0.00</p>
-                        <p>TOTAL SALES: ${totalAmount.toFixed(2)}</p>
-                        <p>ADD: 12% VAT: ${vatAmount.toFixed(2)}</p>
-                        <p><strong>TOTAL AMOUNT DUE: ${totalAmount.toFixed(2)}</strong></p>
+                        <p>VAT EXEMPT SALES: ₱${zeroRatedSales.toFixed(2)}</p>
+                        <p>ZERO RATED SALES: ₱0.00</p>
+                        <p>TOTAL SALES: ₱${totalAmount.toFixed(2)}</p>
+                        <p>ADD: 12% VAT: ₱${vatAmount.toFixed(2)}</p>
+                        <p><strong>TOTAL AMOUNT DUE: ₱${totalAmount.toFixed(2)}</strong></p>
                     </div>
                     <div class="receipt-footer">
                         <div>
@@ -489,7 +531,7 @@ $company_result = $conn->query($company_sql);
                         </div>
                         <div>
                             <p><strong>RECEIVED the goods in good condition:</strong></p>
-                            <p>Signature Over Printed Name: ________________ table-striped_________________________</p>
+                            <p>Signature Over Printed Name: _________________________</p>
                             <p>Date: _________________________</p>
                         </div>
                         <div>

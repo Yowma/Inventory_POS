@@ -7,9 +7,8 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] != 'admin') {
 include 'db.php';
 
 if (isset($_GET['id'])) {
-    $product_id = (int)$_GET['id']; // Cast to integer for safety
+    $product_id = (int)$_GET['id'];
 
-    // Check if the product is referenced in sales_items
     $check_sql = "SELECT COUNT(*) as sales_count FROM sales_items WHERE product_id = ?";
     $check_stmt = $conn->prepare($check_sql);
     $check_stmt->bind_param("i", $product_id);
@@ -19,13 +18,11 @@ if (isset($_GET['id'])) {
     $check_stmt->close();
 
     if ($row['sales_count'] > 0) {
-        // Store error message in session and redirect
         $_SESSION['error'] = "Cannot delete product because it is referenced in " . $row['sales_count'] . " sale(s).";
         header("Location: products.php");
         exit;
     }
 
-    // If no references exist, proceed with deletion
     $sql = "DELETE FROM products WHERE product_id = ?";
     $stmt = $conn->prepare($sql);
     $stmt->bind_param("i", $product_id);

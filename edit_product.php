@@ -6,13 +6,12 @@ include 'db.php';
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $product_id = (int)$_POST['product_id'];
     $name = $_POST['name'];
-    $model_id = $_POST['model_id'] ?: null;
-    $category_id = $_POST['category_id'] ?: null;
+    $model_id = (int)$_POST['model_id'];
     $description = $_POST['description'];
     $price = floatval($_POST['price']);
     
-    $stmt = $conn->prepare("UPDATE products SET name = ?, model_id = ?, category_id = ?, description = ?, price = ? WHERE product_id = ?");
-    $stmt->bind_param("siisdi", $name, $model_id, $category_id, $description, $price, $product_id);
+    $stmt = $conn->prepare("UPDATE products SET name = ?, model_id = ?, description = ?, price = ? WHERE product_id = ?");
+    $stmt->bind_param("sisdi", $name, $model_id, $description, $price, $product_id);
     $stmt->execute();
     $stmt->close();
     

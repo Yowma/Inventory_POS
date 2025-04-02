@@ -3,82 +3,69 @@ session_start();
 if (!isset($_SESSION['user_id']) || $_SESSION['role'] != 'admin') header("Location: login.php");
 include 'db.php';
 
-// Function to check low stock and create/update notification if needed
-function checkLowStock($conn, $product_id, $quantity) {
-    // Fetch product details
-    $sql = "SELECT name FROM products WHERE product_id = ?";
+function checkLowStock($conn, $model_id, $quantity) {
+    $sql = "SELECT name FROM models WHERE model_id = ?";
     $stmt = $conn->prepare($sql);
-    $stmt->bind_param("i", $product_id);
+    $stmt->bind_param("i", $model_id);
     $stmt->execute();
     $result = $stmt->get_result();
-    $product = $result->fetch_assoc();
+    $model = $result->fetch_assoc();
     $stmt->close();
 
-    if ($product) {
-        // Fixed threshold: 10 pieces
+    if ($model) {
         if ($quantity <= 10) {
-            $message = "Product {$product['name']} has reached low stock level (Qty: $quantity).";
-            
-            // Check if an unread notification already exists
-            $sql = "SELECT notification_id FROM notifications WHERE product_id = ? AND is_read = 0";
+            $message = "Model {$model['name']} has reached low stock level (Qty: $quantity).";
+            $sql = "SELECT notification_id FROM notifications WHERE model_id = ? AND is_read = 0";
             $stmt = $conn->prepare($sql);
-            $stmt->bind_param("i", $product_id);
+            $stmt->bind_param("i", $model_id);
             $stmt->execute();
             $result = $stmt->get_result();
             $exists = $result->num_rows > 0;
             $stmt->close();
 
             if ($exists) {
-                // Update existing notification
                 $sql = "UPDATE notifications SET message = ?, current_quantity = ?, created_at = NOW() 
-                        WHERE product_id = ? AND is_read = 0";
+                        WHERE model_id = ? AND is_read = 0";
                 $stmt = $conn->prepare($sql);
-                $stmt->bind_param("sii", $message, $quantity, $product_id);
+                $stmt->bind_param("sii", $message, $quantity, $model_id);
                 $stmt->execute();
-                $stmt->close();
             } else {
-                // Create new notification with notification_type
-                $sql = "INSERT INTO notifications (product_id, notification_type, message, current_quantity, created_at) 
+                $sql = "INSERT INTO notifications (model_id, notification_type, message, current_quantity, created_at) 
                         VALUES (?, 'low_stock', ?, ?, NOW())";
                 $stmt = $conn->prepare($sql);
-                $stmt->bind_param("isi", $product_id, $message, $quantity);
+                $stmt->bind_param("isi", $model_id, $message, $quantity);
                 $stmt->execute();
-                $stmt->close();
             }
         } else {
-            // Clear notification if quantity exceeds 10
-            $sql = "UPDATE notifications SET is_read = 1 WHERE product_id = ? AND is_read = 0";
+            $sql = "UPDATE notifications SET is_read = 1 WHERE model_id = ? AND is_read = 0";
             $stmt = $conn->prepare($sql);
-            $stmt->bind_param("i", $product_id);
+            $stmt->bind_param("i", $model_id);
             $stmt->execute();
-            $stmt->close();
         }
+        $stmt->close();
     }
 }
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    $product_id = $_POST['product_id'];
-    $quantity_to_add = $_POST['quantity'];
+    $model_id = (int)$_POST['model_id'];
+    $quantity_to_add = (int)$_POST['quantity'];
     
-    // Update product quantity
-    $sql = "UPDATE products SET quantity = quantity + ? WHERE product_id = ?";
+    $sql = "UPDATE models SET quantity = quantity + ? WHERE model_id = ?";
     $stmt = $conn->prepare($sql);
-    $stmt->bind_param("ii", $quantity_to_add, $product_id);
+    $stmt->bind_param("ii", $quantity_to_add, $model_id);
     $stmt->execute();
     $stmt->close();
     
-    // Get updated quantity
-    $sql = "SELECT quantity FROM products WHERE product_id = ?";
+    $sql = "SELECT quantity FROM models WHERE model_id = ?";
     $stmt = $conn->prepare($sql);
-    $stmt->bind_param("i", $product_id);
+    $stmt->bind_param("i", $model_id);
     $stmt->execute();
     $result = $stmt->get_result();
-    $product = $result->fetch_assoc();
-    $new_quantity = $product['quantity'];
+    $model = $result->fetch_assoc();
+    $new_quantity = $model['quantity'];
     $stmt->close();
     
-    // Check stock level after adding
-    checkLowStock($conn, $product_id, $new_quantity);
+    checkLowStock($conn, $model_id, $new_quantity);
     
     header("Location: products.php");
     exit();

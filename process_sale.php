@@ -30,14 +30,14 @@ if (json_last_error() !== JSON_ERROR_NONE || empty($cart)) {
 }
 
 foreach ($cart as $item) {
-    if (!isset($item['id'], $item['quantity'], $item['availableQty'])) {
+    if (!isset($item['id'], $item['quantity'], $item['modelId'], $item['availableQty'])) {
         echo json_encode(['success' => false, 'error' => 'Invalid cart item']);
         exit;
     }
 }
 
 $company_id = (int)$_POST['company_id'];
-$po_number = trim($_POST['po_number']); // Get PO number from frontend
+$po_number = trim($_POST['po_number']);
 
 if (empty($po_number)) {
     echo json_encode(['success' => false, 'error' => 'PO number cannot be empty']);
@@ -58,36 +58,45 @@ $stmt->close();
 $conn->begin_transaction();
 try {
     $lowStockThreshold = 10;
-    $notificationStmt = $conn->prepare("INSERT INTO notifications (product_id, message, current_quantity, created_at) 
+    $notificationStmt = $conn->prepare("INSERT INTO notifications (model_id, message, current_quantity, created_at) 
                                       VALUES (?, ?, ?, NOW()) 
                                       ON DUPLICATE KEY UPDATE message = VALUES(message), current_quantity = VALUES(current_quantity), is_read = 0");
 
+    // Group cart items by model to check and update shared quantities
+    $modelQuantities = [];
     foreach ($cart as $item) {
-        $stmt = $conn->prepare("SELECT quantity, name FROM products WHERE product_id = ? FOR UPDATE");
-        $stmt->bind_param("i", $item['id']);
+        $modelId = $item['modelId'];
+        if (!isset($modelQuantities[$modelId])) {
+            $modelQuantities[$modelId] = 0;
+        }
+        $modelQuantities[$modelId] += $item['quantity'];
+    }
+
+    foreach ($modelQuantities as $modelId => $totalQty) {
+        $stmt = $conn->prepare("SELECT quantity, name FROM models WHERE model_id = ? FOR UPDATE");
+        $stmt->bind_param("i", $modelId);
         $stmt->execute();
         $result = $stmt->get_result();
-        $product = $result->fetch_assoc();
+        $model = $result->fetch_assoc();
         $stmt->close();
         
-        if ($product['quantity'] < $item['quantity']) {
-            throw new Exception("Insufficient stock for product ID: " . $item['id']);
+        if ($model['quantity'] < $totalQty) {
+            throw new Exception("Insufficient stock for model ID: " . $modelId);
         }
 
-        $newQuantity = $product['quantity'] - $item['quantity'];
+        $newQuantity = $model['quantity'] - $totalQty;
         if ($newQuantity <= $lowStockThreshold && $newQuantity >= 0) {
-            $message = "Product '" . $product['name'] . "' is running low on stock.";
-            $notificationStmt->bind_param("isi", $item['id'], $message, $newQuantity);
+            $message = "Model '" . $model['name'] . "' is running low on stock.";
+            $notificationStmt->bind_param("isi", $modelId, $message, $newQuantity);
             $notificationStmt->execute();
         }
     }
 
-    // Generate sales_number
     $stmt = $conn->prepare("SELECT MAX(sales_number) as max_sales FROM sales");
     $stmt->execute();
     $result = $stmt->get_result();
     $row = $result->fetch_assoc();
-    $sales_number = $row['max_sales'] ? max(3000, $row['max_sales'] + 1) : 3000; // Start from 3000
+    $sales_number = $row['max_sales'] ? max(3000, $row['max_sales'] + 1) : 3000;
     $stmt->close();
 
     $user_id = $_SESSION['user_id'];
@@ -103,8 +112,13 @@ try {
     $stmt->close();
 
     $stmt = $conn->prepare("INSERT INTO sales_items (sale_id, product_id, quantity, price) VALUES (?, ?, ?, ?)");
-    $updateStmt = $conn->prepare("UPDATE products SET quantity = quantity - ? WHERE product_id = ?");
+    $updateStmt = $conn->prepare("UPDATE models SET quantity = quantity - ? WHERE model_id = ?");
     
+    foreach ($modelQuantities as $modelId => $totalQty) {
+        $updateStmt->bind_param("ii", $totalQty, $modelId);
+        $updateStmt->execute();
+    }
+
     foreach ($cart as $item) {
         $product_id = $item['id'];
         $quantity = $item['quantity'];
@@ -112,9 +126,6 @@ try {
 
         $stmt->bind_param("iiid", $sale_id, $product_id, $quantity, $price);
         $stmt->execute();
-
-        $updateStmt->bind_param("ii", $quantity, $product_id);
-        $updateStmt->execute();
     }
     $stmt->close();
     $updateStmt->close();
@@ -131,7 +142,7 @@ try {
         'cart' => $cart,
         'total_amount' => $total_amount,
         'po_number' => $po_number,
-        'sales_number' => $sales_number // Include sales_number in response
+        'sales_number' => $sales_number
     ]);
 } catch (Exception $e) {
     $conn->rollback();
