@@ -95,6 +95,30 @@ $company_result = $conn->query($company_sql);
             margin-right: 10px;
         }
     </style>
+
+<style>
+    .navbar {
+        position: fixed;
+        top: 0;
+        width: 100%;
+        z-index: 1000;
+        background: rgba(255, 255, 255, 0.95);
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        padding: 15px 20px;
+    }
+    .navbar a {
+        text-decoration: none;
+        color: #333;
+        padding: 10px 15px;
+        transition: color 0.3s ease-in-out;
+    }
+    .navbar a:hover {
+        color: #ff6b6b;
+    }
+    body {
+        padding-top: 60px; /* Prevent content from being hidden under fixed navbar */
+    }
+</style>
 </head>
 <body>
     <div class="main-content">
