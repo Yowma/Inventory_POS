@@ -13,8 +13,8 @@ if ($conn->connect_error) {
     exit;
 }
 
-if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !isset($_POST['cart']) || !isset($_POST['company_id'])) {
-    echo json_encode(['success' => false, 'error' => 'Invalid request']);
+if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !isset($_POST['cart']) || !isset($_POST['company_id']) || !isset($_POST['po_number'])) {
+    echo json_encode(['success' => false, 'error' => 'Invalid request: Missing cart, company_id, or po_number']);
     exit;
 }
 
@@ -29,7 +29,6 @@ if (json_last_error() !== JSON_ERROR_NONE || empty($cart)) {
     exit;
 }
 
-// Modified validation to remove price check
 foreach ($cart as $item) {
     if (!isset($item['id'], $item['quantity'], $item['availableQty'])) {
         echo json_encode(['success' => false, 'error' => 'Invalid cart item']);
@@ -38,6 +37,12 @@ foreach ($cart as $item) {
 }
 
 $company_id = (int)$_POST['company_id'];
+$po_number = trim($_POST['po_number']); // Get PO number from frontend
+
+if (empty($po_number)) {
+    echo json_encode(['success' => false, 'error' => 'PO number cannot be empty']);
+    exit;
+}
 
 $stmt = $conn->prepare("SELECT company_id, name, address, tin_no FROM companies WHERE company_id = ?");
 $stmt->bind_param("i", $company_id);
@@ -77,15 +82,22 @@ try {
         }
     }
 
+    // Generate sales_number
+    $stmt = $conn->prepare("SELECT MAX(sales_number) as max_sales FROM sales");
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $row = $result->fetch_assoc();
+    $sales_number = $row['max_sales'] ? max(3000, $row['max_sales'] + 1) : 3000; // Start from 3000
+    $stmt->close();
+
     $user_id = $_SESSION['user_id'];
     $total_amount = 0;
-    // Modified to use company-specific prices from the cart
     foreach ($cart as $item) {
         $total_amount += $item['price'] * $item['quantity'];
     }
 
-    $stmt = $conn->prepare("INSERT INTO sales (user_id, company_id, sale_date, total_amount) VALUES (?, ?, NOW(), ?)");
-    $stmt->bind_param("iid", $user_id, $company_id, $total_amount);
+    $stmt = $conn->prepare("INSERT INTO sales (user_id, company_id, sale_date, total_amount, po_number, sales_number) VALUES (?, ?, NOW(), ?, ?, ?)");
+    $stmt->bind_param("iidsi", $user_id, $company_id, $total_amount, $po_number, $sales_number);
     $stmt->execute();
     $sale_id = $conn->insert_id;
     $stmt->close();
@@ -96,7 +108,7 @@ try {
     foreach ($cart as $item) {
         $product_id = $item['id'];
         $quantity = $item['quantity'];
-        $price = $item['price']; // Still needed for sales_items table
+        $price = $item['price'];
 
         $stmt->bind_param("iiid", $sale_id, $product_id, $quantity, $price);
         $stmt->execute();
@@ -117,7 +129,9 @@ try {
         'sale_id' => $sale_id,
         'company' => $company,
         'cart' => $cart,
-        'total_amount' => $total_amount
+        'total_amount' => $total_amount,
+        'po_number' => $po_number,
+        'sales_number' => $sales_number // Include sales_number in response
     ]);
 } catch (Exception $e) {
     $conn->rollback();

@@ -205,6 +205,9 @@
                     <li><a href="manage_companies.php">Manage Companies</a></li>
                 </ul>
             </li>
+            <li><a href="upload_receipt.php"><i class="fas fa-upload"></i> <span>Upload Receipt</span></a></li>
+            <li><a href="view_receipts.php"><i class="fas fa-receipt"></i> <span>View Receipts</span></a></li>
+
             <li><a href="logout.php"><i class="fas fa-sign-out-alt"></i> <span>Logout</span></a></li>
         </ul>
     </div>

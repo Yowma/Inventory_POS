@@ -57,6 +57,37 @@ $company_result = $conn->query($company_sql);
             font-weight: bold;
             color: #28a745;
         }
+        /* Popup Styling */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            display: none;
+        }
+        .modal-po {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #fff;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            z-index: 1001;
+            width: 400px;
+            max-width: 90%;
+        }
+        .modal-po h4 {
+            margin-bottom: 15px;
+            color: #007bff;
+        }
+        .modal-po .btn {
+            margin-right: 10px;
+        }
     </style>
 </head>
 <body>
@@ -112,6 +143,16 @@ $company_result = $conn->query($company_sql);
         </div>
     </div>
 
+    <!-- PO Number Popup -->
+    <div id="poModal" class="modal-overlay">
+        <div class="modal-po">
+            <h4>Enter Purchase Order Number</h4>
+            <input type="text" id="po_number_input" class="form-control mb-3" placeholder="Enter PO Number" required>
+            <button class="btn btn-primary" id="submit_po">Submit</button>
+            <button class="btn btn-secondary" id="cancel_po">Cancel</button>
+        </div>
+    </div>
+
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script>
     $(document).ready(function() {
@@ -122,11 +163,11 @@ $company_result = $conn->query($company_sql);
             $('.product-item').each(function() {
                 var productId = $(this).data('id');
                 var price = prices[productId] !== undefined ? parseFloat(prices[productId]) : 0;
-                if (isNaN(price)) price = 0; // Ensure price is a valid number
+                if (isNaN(price)) price = 0;
                 $(this).data('price', price);
                 $(this).find('.price-display').text(price.toFixed(2));
             });
-            updateCart(); // Update cart prices if items exist
+            updateCart();
         }
 
         // Company selection handler
@@ -140,23 +181,20 @@ $company_result = $conn->query($company_sql);
                     dataType: 'json',
                     success: function(response) {
                         if (response.success) {
-                            console.log('Prices fetched:', response.prices); // Debug log
                             updateProductPrices(response.prices);
                         } else {
                             alert('Error fetching prices: ' + response.error);
-                            $('#company_select').val(''); // Reset selection on error
-                            updateProductPrices({}); // Reset prices
+                            $('#company_select').val('');
+                            updateProductPrices({});
                         }
                     },
                     error: function(xhr, status, error) {
-                        console.error('AJAX error:', error, xhr.responseText); // Debug log
                         alert('AJAX error: ' + error);
-                        $('#company_select').val(''); // Reset selection on error
-                        updateProductPrices({}); // Reset prices
+                        $('#company_select').val('');
+                        updateProductPrices({});
                     }
                 });
             } else {
-                // Reset prices to 0 when no company is selected
                 updateProductPrices({});
             }
         });
@@ -185,7 +223,7 @@ $company_result = $conn->query($company_sql);
             }
 
             if (price === 0) {
-                alert('This product has a price of $0.00. Please set a price for this product in the price configuration.');
+                alert('This product has a price of $0.00. Please set a price.');
                 return;
             }
 
@@ -212,9 +250,9 @@ $company_result = $conn->query($company_sql);
             var total = 0;
             cart.forEach(function(item) {
                 var price = parseFloat(item.price);
-                if (isNaN(price)) price = 0; // Ensure price is valid
+                if (isNaN(price)) price = 0;
                 var subtotal = price * item.quantity;
-                if (isNaN(subtotal)) subtotal = 0; // Ensure subtotal is valid
+                if (isNaN(subtotal)) subtotal = 0;
                 total += subtotal;
                 cartHtml += `<tr>
                     <td>${item.name}</td>
@@ -255,7 +293,7 @@ $company_result = $conn->query($company_sql);
             updateCart();
         });
 
-        // Finalize sale handler
+        // Finalize sale handler - Show popup
         $('#finalize_sale').on('click', function() {
             if (cart.length === 0) {
                 alert('Cart is empty');
@@ -266,12 +304,26 @@ $company_result = $conn->query($company_sql);
                 alert('Please select a company');
                 return;
             }
+            // Show the PO number popup in the middle of the screen
+            $('#poModal').css('display', 'block');
+            $('#po_number_input').focus();
+        });
+
+        // Submit PO number
+        $('#submit_po').on('click', function() {
+            var po_number = $('#po_number_input').val().trim();
+            if (!po_number) {
+                alert('Please enter a PO number');
+                return;
+            }
+            var company_id = $('#company_select').val();
             $.ajax({
                 url: 'process_sale.php',
                 type: 'POST',
                 data: { 
                     cart: JSON.stringify(cart),
-                    company_id: company_id
+                    company_id: company_id,
+                    po_number: po_number
                 },
                 dataType: 'json',
                 success: function(response) {
@@ -281,6 +333,8 @@ $company_result = $conn->query($company_sql);
                         cart = [];
                         updateCart();
                         $('#company_select').val('');
+                        $('#poModal').css('display', 'none');
+                        $('#po_number_input').val('');
                         location.reload();
                     } else {
                         alert('Error: ' + (response.error || 'Unknown error'));
@@ -290,6 +344,12 @@ $company_result = $conn->query($company_sql);
                     alert('AJAX error: ' + error + '\nResponse: ' + xhr.responseText);
                 }
             });
+        });
+
+        // Cancel PO number input
+        $('#cancel_po').on('click', function() {
+            $('#poModal').css('display', 'none');
+            $('#po_number_input').val('');
         });
 
         // Receipt generation
@@ -374,7 +434,7 @@ $company_result = $conn->query($company_sql);
                         <p>CITY OF MANDALUYONG NCR, SECOND DISTRICT PHILIPPINES</p>
                         <p>VAT Reg. TIN: 008-931-956-00000</p>
                         <h2>SALES INVOICE</h2>
-                        <p>No. ${data.sale_id}</p>
+                        <p>No. ${data.sales_number}</p>
                     </div>
                     <div class="receipt-details">
                         <div>
@@ -385,7 +445,7 @@ $company_result = $conn->query($company_sql);
                         <div>
                             <p><strong>DATE:</strong> ${currentDate}</p>
                             <p><strong>TERMS:</strong> Due on Receipt</p>
-                            <p><strong>PO NO.:</strong> N/A</p>
+                            <p><strong>PO NO.:</strong> ${data.po_number}</p>
                         </div>
                     </div>
                     <table class="receipt-table">
@@ -429,7 +489,7 @@ $company_result = $conn->query($company_sql);
                         </div>
                         <div>
                             <p><strong>RECEIVED the goods in good condition:</strong></p>
-                            <p>Signature Over Printed Name: _________________________</p>
+                            <p>Signature Over Printed Name: ________________ table-striped_________________________</p>
                             <p>Date: _________________________</p>
                         </div>
                         <div>
