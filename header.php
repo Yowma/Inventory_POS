@@ -20,6 +20,8 @@
             background-color: #f4f6f9;
             margin: 0;
             padding: 0;
+            height: 100vh;
+            overflow-x: hidden;
         }
 
         /* Navbar */
@@ -30,7 +32,7 @@
             left: 0;
             right: 0;
             z-index: 1030;
-            height: 60px; /* Set a fixed height for consistency */
+            height: 60px;
             background-color: #fff;
         }
         .navbar-brand {
@@ -62,15 +64,17 @@
         /* Sidebar */
         #sidebar {
             position: fixed;
-            top: 60px; /* Match navbar height */
+            top: 60px;
             left: 0;
-            bottom: 0;
+            height: calc(100vh - 60px);
             width: 60px;
             background-color: #2a6041;
             transition: width 0.3s ease;
             overflow-y: auto;
             overflow-x: hidden;
             z-index: 1050;
+            display: flex;
+            flex-direction: column;
         }
         #sidebar:hover {
             width: 220px;
@@ -79,6 +83,9 @@
             list-style: none;
             padding: 0;
             margin: 0;
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
         }
         #sidebar li {
             padding: 10px;
@@ -110,14 +117,34 @@
         }
 
         /* Dropdown in Sidebar */
+        #sidebar .dropdown {
+            position: relative;
+        }
+        #sidebar .dropdown-toggle {
+            display: flex;
+            align-items: center;
+            color: #ffffff;
+            text-decoration: none;
+            padding: 10px;
+            transition: background-color 0.2s ease;
+            cursor: pointer;
+        }
+        #sidebar .dropdown-toggle:hover {
+            background-color: #3d8c5e;
+        }
         #sidebar .dropdown-menu {
             background-color: #3d8c5e;
             border: none;
             margin-left: 50px;
-            margin-top: 5px;
+            margin-top: -5px; /* Adjusted to align with parent */
             padding: 0;
             width: 170px;
             z-index: 1060;
+            position: absolute;
+            display: none; /* Hidden by default, controlled by Bootstrap JS */
+        }
+        #sidebar .dropdown-menu.show {
+            display: block; /* Shown only when toggled */
         }
         #sidebar .dropdown-menu a {
             color: #ffffff;
@@ -139,10 +166,12 @@
         /* Main Content */
         .main-content {
             margin-left: 60px;
-            padding: 80px 20px 20px; /* Adjusted to account for navbar height */
-            transition: margin-left 0.3s ease;
+            padding: 20px;
+            margin-top: 60px;
             min-height: calc(100vh - 60px);
+            transition: margin-left 0.3s ease;
             z-index: 1000;
+            overflow-y: auto;
         }
         #sidebar:hover ~ .main-content {
             margin-left: 220px;
@@ -152,13 +181,15 @@
         @media (max-width: 768px) {
             #sidebar {
                 width: 0;
+                height: calc(100vh - 60px);
             }
             #sidebar:hover {
                 width: 220px;
             }
             .main-content {
                 margin-left: 0;
-                padding: 80px 10px 10px;
+                padding: 20px;
+                margin-top: 60px;
             }
             #sidebar:hover ~ .main-content {
                 margin-left: 0;
@@ -197,26 +228,24 @@
             <li><a href="pos.php"><i class="fas fa-calculator"></i> <span>POS</span></a></li>
             <li><a href="reports.php"><i class="fas fa-chart-bar"></i> <span>Reports</span></a></li>
             <li class="dropdown">
-                <a href="#" class="dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                <a href="#" class="dropdown-toggle" id="configDropdown" data-bs-toggle="dropdown" aria-expanded="false">
                     <i class="fas fa-cog"></i> <span>Configuration</span>
                 </a>
-                <ul class="dropdown-menu">
+                <ul class="dropdown-menu" aria-labelledby="configDropdown">
                     <li><a href="price_configuration.php">Price Configuration</a></li>
                     <li><a href="manage_companies.php">Manage Companies</a></li>
                 </ul>
             </li>
             <li><a href="upload_receipt.php"><i class="fas fa-upload"></i> <span>Upload Receipt</span></a></li>
-            <li><a href="view_receipts.php"><i class="fas fa-receipt"></i> <span>View Receipts</span></a></li>
-
+            <li><a href="view_receipts.php"><i class="fas fa-receipt"></i> <span>View Receipt</span></a></li>
             <li><a href="logout.php"><i class="fas fa-sign-out-alt"></i> <span>Logout</span></a></li>
         </ul>
     </div>
 
     <!-- Main Content Area -->
     <div class="main-content">
-        <!-- Dynamic content will be included here -->
 
-         <!-- JavaScript Files -->
+    <!-- JavaScript Files -->
     <script src="https://code.jquery.com/jquery-3.5.1.min.js" integrity="sha256-9/aliU8dGd2tb6OSsuzixeV4y/faTqgFtohetphbbj0=" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js" integrity="sha384-geWF76RCwLtnZ8qwWowPQNguL3RmwHVBC9FhGdlKrxdiJJigb/j/68SIy3Te4Bkz" crossorigin="anonymous"></script>
 </body>

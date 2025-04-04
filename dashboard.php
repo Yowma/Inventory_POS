@@ -126,7 +126,7 @@ $recent_orders = $recent_orders_query->fetchAll(PDO::FETCH_ASSOC);
                                             <td><?php echo htmlspecialchars($order['username'] ?? 'Guest'); ?></td>
                                             <td><?php echo htmlspecialchars($order['product_name']); ?></td>
                                             <td><?php echo $order['quantity']; ?></td>
-                                            <td>$<?php echo number_format($order['total_amount'], 2); ?></td>
+                                            <td>₱<?php echo number_format($order['total_amount'], 2); ?></td>
                                             <td><?php echo date('M d, Y', strtotime($order['sale_date'])); ?></td>
                                         </tr>
                                     <?php endforeach; ?>
@@ -153,7 +153,7 @@ const salesChart = new Chart(ctx, {
     data: {
         labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
         datasets: [{
-            label: 'Sales ($)',
+            label: 'Sales (₱)',
             data: <?php echo json_encode($monthly_sales); ?>,
             borderColor: 'rgb(52, 143, 226)',
             backgroundColor: 'rgba(52, 143, 226, 0.1)',
@@ -168,7 +168,7 @@ const salesChart = new Chart(ctx, {
                 beginAtZero: true,
                 title: {
                     display: true,
-                    text: 'Sales Amount ($)'
+                    text: 'Sales Amount (₱)'
                 }
             },
             x: {
