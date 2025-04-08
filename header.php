@@ -136,15 +136,15 @@
             background-color: #3d8c5e;
             border: none;
             margin-left: 50px;
-            margin-top: -5px; /* Adjusted to align with parent */
+            margin-top: -5px;
             padding: 0;
             width: 170px;
             z-index: 1060;
             position: absolute;
-            display: none; /* Hidden by default, controlled by Bootstrap JS */
+            display: none;
         }
         #sidebar .dropdown-menu.show {
-            display: block; /* Shown only when toggled */
+            display: block;
         }
         #sidebar .dropdown-menu a {
             color: #ffffff;
@@ -165,7 +165,7 @@
 
         /* Main Content */
         .main-content {
-            margin-left: 60px;
+            margin-left: <?php echo defined('NO_SIDEBAR') ? '0' : '60px'; ?>;
             padding: 20px;
             margin-top: 60px;
             min-height: calc(100vh - 60px);
@@ -173,9 +173,11 @@
             z-index: 1000;
             overflow-y: auto;
         }
+        <?php if (!defined('NO_SIDEBAR')): ?>
         #sidebar:hover ~ .main-content {
             margin-left: 220px;
         }
+        <?php endif; ?>
 
         /* Responsive Design */
         @media (max-width: 768px) {
@@ -211,7 +213,7 @@
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
                 <span class="navbar-toggler-icon"></span>
             </button>
-            <div class="collapse navbar-collapse" id="navbarNav">
+            <div class="collapse navbar-nav ms-auto" id="navbarNav">
                 <ul class="navbar-nav ms-auto">
                     <li class="nav-item">
                     </li>
@@ -220,7 +222,8 @@
         </div>
     </nav>
 
-    <!-- Sidebar -->
+    <!-- Sidebar (conditionally included) -->
+    <?php if (!defined('NO_SIDEBAR')): ?>
     <div id="sidebar">
         <ul>
             <li><a href="dashboard.php"><i class="fas fa-home"></i> <span>Home</span></a></li>
@@ -241,6 +244,7 @@
             <li><a href="logout.php"><i class="fas fa-sign-out-alt"></i> <span>Logout</span></a></li>
         </ul>
     </div>
+    <?php endif; ?>
 
     <!-- Main Content Area -->
     <div class="main-content">

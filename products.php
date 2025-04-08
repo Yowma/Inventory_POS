@@ -64,7 +64,7 @@ $modelFilterResult = $conn->query($modelFilterSql);
             <div class="d-flex align-items-center">
                 <div class="notification-wrapper position-relative me-3">
                     <div class="dropdown">
-                        <button class="btn btn-link position-relative" type="button" id="notificationDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                        <button class="btn btn-link position-relative notification-bell" type="button" id="notificationDropdown" data-bs-toggle="dropdown" aria-expanded="false">
                             <i class="fas fa-bell fa-lg"></i>
                             <?php
                             $notificationSql = "SELECT n.*, m.name FROM notifications n 
@@ -332,6 +332,7 @@ $modelFilterResult = $conn->query($modelFilterSql);
 </div>
 
 <script src="https://code.jquery.com/jquery-3.6.0.min.js" integrity="sha256-/xUj+3OJU5yExlq6GSYGSHk7tPXikynS7ogEvDej/m4=" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js" integrity="sha384-geWF76RCwLtnZ8qwWowPQNguL3RmwHVBC9FhGdlKrxdiJJigb/j/68SIy3Te4Bkz" crossorigin="anonymous"></script>
 <script>
 $(document).ready(function() {
     if (<?php echo isset($_SESSION['refresh_products']) && $_SESSION['refresh_products'] ? 'true' : 'false'; ?>) {
@@ -369,7 +370,7 @@ $(document).ready(function() {
                 $('#edit_name').val(data.name);
                 $('#edit_model_id').val(data.model_id);
                 $('#edit_description').val(data.description || '');
-                $('#edit_price').val(data.price); // Populate price
+                $('#edit_price').val(data.price);
             },
             error: function(xhr, status, error) {
                 console.error('AJAX Error: ' + error);
@@ -443,6 +444,10 @@ $(document).ready(function() {
                         menuContent += '<div class="p-3 text-center text-muted">No new notifications</div>';
                     }
                     $menu.html(menuContent);
+
+                    // Reinitialize Bootstrap dropdown after updating content
+                    $bell.dropdown('dispose'); // Dispose of any existing dropdown instance
+                    $bell.dropdown(); // Reinitialize the dropdown
                 }
             },
             error: function(xhr, status, error) {
@@ -453,9 +458,10 @@ $(document).ready(function() {
 
     $('#refreshNotifications').on('click', function() {
         updateNotifications();
-        location.reload();
+        // location.reload(); // Removed to avoid full page reload
     });
 
+    // Initial call to update notifications
     updateNotifications();
 });
 </script>
@@ -517,6 +523,10 @@ $(document).ready(function() {
     }
     .card-body { padding: 25px; }
     .notification-wrapper .badge { font-size: 0.7rem; padding: 4px 6px; }
+    .notification-bell {
+        z-index: 1040; /* Ensure it’s above other elements */
+        cursor: pointer;
+    }
 </style>
 
 <?php include 'footer.php'; ?>
