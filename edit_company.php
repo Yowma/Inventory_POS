@@ -37,14 +37,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_company'])) {
     $tin_no = $_POST['company_tin'];
     $contact_person = $_POST['company_contact_person'];
     $contact_number = $_POST['company_contact_number'];
+    $telephone = $_POST['telephone'];
     $business_style = $_POST['company_business_style'];
     
     $stmt = $conn->prepare("
         UPDATE companies 
-        SET name = ?, address = ?, tin_no = ?, contact_person = ?, contact_number = ?, business_style = ?
+        SET name = ?, address = ?, tin_no = ?, contact_person = ?, contact_number = ?, telephone = ?, business_style = ?
         WHERE company_id = ?
     ");
-    $stmt->bind_param("ssssssi", $name, $address, $tin_no, $contact_person, $contact_number, $business_style, $company_id);
+    $stmt->bind_param("sssssssi", $name, $address, $tin_no, $contact_person, $contact_number, $telephone, $business_style, $company_id);
     $stmt->execute();
     $stmt->close();
     
@@ -80,6 +81,10 @@ include 'header.php';
                 <div class="col-md-6 mb-3">
                     <label class="form-label">Contact Number</label>
                     <input type="text" name="company_contact_number" class="form-control" placeholder="Enter contact number" value="<?php echo htmlspecialchars($company['contact_number']); ?>">
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label class="form-label">Telephone Number</label>
+                    <input type="text" name="telephone" class="form-control" placeholder="Enter telephone number" value="<?php echo htmlspecialchars($company['telephone']); ?>">
                 </div>
                 <div class="col-md-6 mb-3">
                     <label class="form-label">Business Style</label>
@@ -139,14 +144,12 @@ include 'header.php';
 <script src="https://code.jquery.com/jquery-3.5.1.min.js" integrity="sha256-9/aliU8dGd2tb6OSsuzixeV4y/faTqgFtohetphbbj0=" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js" integrity="sha384-geWF76RCwLtnZ8qwWowPQNguL3RmwHVBC9FhGdlKrxdiJJigb/j/68SIy3Te4Bkz" crossorigin="anonymous"></script>
 <script>
-    // Ensure dropdown works on click
     $(document).ready(function() {
         $('.dropdown-toggle').on('click', function(e) {
             e.preventDefault();
             $(this).next('.dropdown-menu').toggleClass('show');
         });
 
-        // Close dropdown when clicking outside
         $(document).on('click', function(e) {
             if (!$(e.target).closest('.dropdown').length) {
                 $('.dropdown-menu').removeClass('show');

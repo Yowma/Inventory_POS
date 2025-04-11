@@ -8,23 +8,24 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
-// Handle form submission
+// Handle form submission for adding a company
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_company'])) {
-    $name = trim($_POST['company_name']); // Trim whitespace
+    $name = trim($_POST['company_name']);
     $address = $_POST['company_address'];
     $tin_no = $_POST['company_tin'];
     $contact_person = $_POST['company_contact_person'];
     $contact_number = $_POST['company_contact_number'];
+    $telephone = $_POST['telephone'];
     $business_style = $_POST['company_business_style'];
 
-    // Server-side validation for TIN number (XXX-XXX-XXX format)
-    if (!preg_match('/^\d{3}-\d{3}-\d{3}$/', $tin_no)) {
-        $error = "TIN Number must be in the format XXX-XXX-XXX (9 digits total)";
-    }
-
-    // Server-side validation for contact number (exactly 11 digits)
+    // Server-side validation for contact number (exactly 11 digits if provided)
     if (!empty($contact_number) && !preg_match('/^\d{11}$/', $contact_number)) {
         $error = "Contact Number must be exactly 11 digits";
+    }
+
+    // Server-side validation for telephone (optional, up to 20 digits)
+    if (!empty($telephone) && !preg_match('/^\d{1,20}$/', $telephone)) {
+        $error = "Telephone Number must contain only digits and be up to 20 characters";
     }
 
     // Check for duplicate company name
@@ -37,19 +38,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_company'])) {
         $stmt->close();
 
         if ($count > 0 && !isset($_POST['confirm_duplicate'])) {
-            // If a duplicate is found and the user hasn't confirmed, show the confirmation prompt
             $error = "A company with the name '$name' already exists. Do you want to continue adding this company?";
             $show_confirm = true;
         }
     }
 
-    // If there are no errors and either no duplicate or user confirmed, proceed with insertion
+    // If no errors or user confirmed duplicate, insert the company
     if (!isset($error) || (isset($_POST['confirm_duplicate']) && $_POST['confirm_duplicate'] === 'yes')) {
         $stmt = $conn->prepare("
-            INSERT INTO companies (name, address, tin_no, contact_person, contact_number, business_style) 
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO companies (name, address, tin_no, contact_person, contact_number, telephone, business_style) 
+            VALUES (?, ?, ?, ?, ?, ?, ?)
         ");
-        $stmt->bind_param("ssssss", $name, $address, $tin_no, $contact_person, $contact_number, $business_style);
+        $stmt->bind_param("sssssss", $name, $address, $tin_no, $contact_person, $contact_number, $telephone, $business_style);
         $stmt->execute();
         $stmt->close();
         header("Location: manage_companies.php");
@@ -57,14 +57,69 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_company'])) {
     }
 }
 
-include 'header.php';
+// Handle search and pagination for initial page load
+$companies_per_page = 8;
+$page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
+$offset = ($page - 1) * $companies_per_page;
 
-$company_sql = "SELECT * FROM companies ORDER BY name";
-$company_result = $conn->query($company_sql);
+// Get search term if provided
+$search_term = isset($_GET['search']) ? trim($_GET['search']) : '';
+
+// Build the WHERE clause based on search term
+$where_clauses = [];
+$params = [];
+$param_types = '';
+
+if ($search_term) {
+    $where_clauses[] = "name LIKE ?";
+    $params[] = "%$search_term%";
+    $param_types .= 's';
+}
+
+$where_sql = !empty($where_clauses) ? 'WHERE ' . implode(' AND ', $where_clauses) : '';
+
+// Get total number of companies (filtered by search term if provided)
+$total_companies_sql = "SELECT COUNT(*) FROM companies $where_sql";
+$stmt = $conn->prepare($total_companies_sql);
+if (!empty($params)) {
+    $stmt->bind_param($param_types, ...$params);
+}
+$stmt->execute();
+$stmt->bind_result($total_companies);
+$stmt->fetch();
+$stmt->close();
+
+$total_pages = ceil($total_companies / $companies_per_page);
+
+// Fetch companies for the current page, sorted alphabetically, and filtered by search term
+$company_sql = "SELECT * FROM companies $where_sql ORDER BY name ASC LIMIT ? OFFSET ?";
+$stmt = $conn->prepare($company_sql);
+$param_types .= 'ii';
+$params[] = $companies_per_page;
+$params[] = $offset;
+$stmt->bind_param($param_types, ...$params);
+$stmt->execute();
+$company_result = $stmt->get_result();
+$stmt->close();
+
+include 'header.php';
 ?>
 
 <div class="container">
     <h2 class="text-center mb-4">Manage Companies</h2>
+
+    <!-- Search Bar -->
+    <div class="row mb-4">
+        <div class="col-md-6 offset-md-3">
+            <div class="d-flex">
+                <input type="text" id="searchInput" class="form-control me-2" placeholder="Search companies by name..." value="<?php echo htmlspecialchars($search_term); ?>">
+                <?php if ($search_term): ?>
+                    <a href="manage_companies.php" class="btn btn-secondary ms-2">Clear</a>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+
     <?php if (isset($error)): ?>
         <div class="alert alert-warning" role="alert">
             <?php echo htmlspecialchars($error); ?>
@@ -76,6 +131,7 @@ $company_result = $conn->query($company_sql);
                         <input type="hidden" name="company_tin" value="<?php echo htmlspecialchars($tin_no); ?>">
                         <input type="hidden" name="company_contact_person" value="<?php echo htmlspecialchars($contact_person); ?>">
                         <input type="hidden" name="company_contact_number" value="<?php echo htmlspecialchars($contact_number); ?>">
+                        <input type="hidden" name="telephone" value="<?php echo htmlspecialchars($telephone); ?>">
                         <input type="hidden" name="company_business_style" value="<?php echo htmlspecialchars($business_style); ?>">
                         <input type="hidden" name="add_company" value="1">
                         <input type="hidden" name="confirm_duplicate" value="yes">
@@ -88,32 +144,64 @@ $company_result = $conn->query($company_sql);
             <?php endif; ?>
         </div>
     <?php endif; ?>
+
     <div class="row" id="company_list">
-        <?php 
-        $company_result->data_seek(0);
-        while ($company = $company_result->fetch_assoc()): ?>
-            <div class="col-md-4 col-lg-3 mb-4">
-                <div class="config-item">
-                    <h5><?php echo htmlspecialchars($company['name']); ?></h5>
-                    <p class="text-muted"><i class="fas fa-map-marker-alt me-2"></i><?php echo htmlspecialchars($company['address']); ?></p>
-                    <p class="text-muted"><strong>TIN:</strong> <?php echo htmlspecialchars($company['tin_no']); ?></p>
-                    <?php if (!empty($company['contact_person'])): ?>
-                        <p class="text-muted"><i class="fas fa-user me-2"></i><?php echo htmlspecialchars($company['contact_person']); ?></p>
-                    <?php endif; ?>
-                    <?php if (!empty($company['contact_number'])): ?>
-                        <p class="text-muted"><i class="fas fa-phone me-2"></i><?php echo htmlspecialchars($company['contact_number']); ?></p>
-                    <?php endif; ?>
-                    <?php if (!empty($company['business_style'])): ?>
-                        <p class="text-muted"><i class="fas fa-briefcase me-2"></i><?php echo htmlspecialchars($company['business_style']); ?></p>
-                    <?php endif; ?>
-                    <div class="d-flex justify-content-end mt-3">
-                        <a href="edit_company.php?id=<?php echo $company['company_id']; ?>" class="btn btn-sm btn-outline-primary me-2">Edit</a>
-                        <a href="delete_company.php?id=<?php echo $company['company_id']; ?>" class="btn btn-sm btn-outline-danger" onclick="return confirm('Are you sure you want to delete this company?');">Delete</a>
+        <?php if ($total_companies == 0 && $search_term): ?>
+            <div class="alert alert-info text-center" role="alert">
+                No companies found matching "<?php echo htmlspecialchars($search_term); ?>".
+            </div>
+        <?php else: ?>
+            <?php while ($company = $company_result->fetch_assoc()): ?>
+                <div class="col-md-4 col-lg-3 mb-4">
+                    <div class="config-item">
+                        <h5><?php echo htmlspecialchars($company['name']); ?></h5>
+                        <div class="company-details">
+                            <p class="text-muted"><i class="fas fa-map-marker-alt me-2"></i><?php echo htmlspecialchars($company['address']); ?></p>
+                            <p class="text-muted"><strong>TIN:</strong> <?php echo htmlspecialchars($company['tin_no']); ?></p>
+                            <?php if (!empty($company['contact_person'])): ?>
+                                <p class="text-muted"><i class="fas fa-user me-2"></i><?php echo htmlspecialchars($company['contact_person']); ?></p>
+                            <?php endif; ?>
+                            <?php if (!empty($company['contact_number'])): ?>
+                                <p class="text-muted"><i class="fas fa-phone me-2"></i><?php echo htmlspecialchars($company['contact_number']); ?></p>
+                            <?php endif; ?>
+                            <?php if (!empty($company['telephone'])): ?>
+                                <p class="text-muted"><i class="fas fa-phone-alt me-2"></i><?php echo htmlspecialchars($company['telephone']); ?></p>
+                            <?php endif; ?>
+                            <?php if (!empty($company['business_style'])): ?>
+                                <p class="text-muted"><i class="fas fa-briefcase me-2"></i><?php echo htmlspecialchars($company['business_style']); ?></p>
+                            <?php endif; ?>
+                        </div>
+                        <div class="d-flex justify-content-end mt-auto">
+                            <a href="edit_company.php?id=<?php echo $company['company_id']; ?>" class="btn btn-sm btn-outline-primary me-2">Edit</a>
+                            <a href="delete_company.php?id=<?php echo $company['company_id']; ?>" class="btn btn-sm btn-outline-danger" onclick="return confirm('Are you sure you want to delete this company?');">Delete</a>
+                        </div>
                     </div>
                 </div>
-            </div>
-        <?php endwhile; ?>
+            <?php endwhile; ?>
+        <?php endif; ?>
     </div>
+
+    <!-- Pagination Controls -->
+    <div id="pagination" class="d-flex justify-content-between align-items-center mt-4">
+        <div>
+            <?php if ($page > 1): ?>
+                <a href="#" class="btn btn-secondary pagination-btn" data-page="<?php echo $page - 1; ?>"> <i class="fas fa-arrow-left me-1"></i> Previous </a>
+            <?php else: ?>
+                <a href="#" class="btn btn-secondary pagination-btn disabled" onclick="return false;"> <i class="fas fa-arrow-left me-1"></i> Previous </a>
+            <?php endif; ?>
+        </div>
+        <div class="page-info">
+            <span>Page <?php echo $page; ?> of <?php echo $total_pages; ?></span>
+        </div>
+        <div>
+            <?php if ($page < $total_pages): ?>
+                <a href="#" class="btn btn-primary pagination-btn" data-page="<?php echo $page + 1; ?>"> Next <i class="fas fa-arrow-right ms-1"></i> </a>
+            <?php else: ?>
+                <a href="#" class="btn btn-primary pagination-btn disabled" onclick="return false;"> Next <i class="fas fa-arrow-right ms-1"></i> </a>
+            <?php endif; ?>
+        </div>
+    </div>
+
     <div class="card p-4 mt-4">
         <h5 class="mb-3">Add New Company</h5>
         <form method="POST" action="" id="addCompanyForm">
@@ -128,8 +216,8 @@ $company_result = $conn->query($company_sql);
                 </div>
                 <div class="col-md-6 mb-3">
                     <label class="form-label">TIN Number</label>
-                    <input type="text" name="company_tin" id="company_tin" class="form-control" placeholder="XXX-XXX-XXX" required>
-                    <small class="form-text text-muted">Format: XXX-XXX-XXX (9 digits total)</small>
+                    <input type="text" name="company_tin" id="company_tin" class="form-control" placeholder="XXX-XXX-XXX">
+                    <small class="form-text text-muted">Optional field (suggested format: XXX-XXX-XXX)</small>
                 </div>
                 <div class="col-md-6 mb-3">
                     <label class="form-label">Contact Person</label>
@@ -139,6 +227,11 @@ $company_result = $conn->query($company_sql);
                     <label class="form-label">Contact Number</label>
                     <input type="text" name="company_contact_number" id="company_contact_number" class="form-control" placeholder="Enter contact number">
                     <small class="form-text text-muted">Must be exactly 11 digits</small>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label class="form-label">Telephone Number</label>
+                    <input type="text" name="telephone" id="telephone" class="form-control" placeholder="Enter telephone number">
+                    <small class="form-text text-muted">Up to 20 digits</small>
                 </div>
                 <div class="col-md-6 mb-3">
                     <label class="form-label">Business Style</label>
@@ -160,6 +253,10 @@ $company_result = $conn->query($company_sql);
         transition: transform 0.3s ease, box-shadow 0.3s ease;
         position: relative;
         overflow: hidden;
+        min-height: 300px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
     }
     .config-item:hover {
         transform: translateY(-5px);
@@ -170,15 +267,25 @@ $company_result = $conn->query($company_sql);
         color: #2a6041;
         font-size: 1.3rem;
         font-weight: 600;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
-    .config-item p {
+    .company-details {
+        flex-grow: 1;
+        overflow: hidden;
+    }
+    .company-details p {
         margin: 8px 0;
         color: #495057;
         font-size: 0.9rem;
         display: flex;
         align-items: center;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
-    .config-item p i {
+    .company-details p i {
         color: #6c757d;
         margin-right: 8px;
     }
@@ -222,19 +329,96 @@ $company_result = $conn->query($company_sql);
     .btn-success:hover {
         background-color: #3d8c5e;
     }
+    .pagination-btn {
+        padding: 8px 20px;
+        border-radius: 8px;
+        font-weight: 500;
+        transition: background-color 0.3s ease, transform 0.2s ease;
+        display: inline-flex;
+        align-items: center;
+        min-width: 110px;
+        justify-content: center;
+        text-align: center;
+    }
+    .btn-primary.pagination-btn {
+        background-color: #2a6041;
+        border-color: #2a6041;
+    }
+    .btn-primary.pagination-btn:hover:not(.disabled) {
+        background-color: #3d8c5e;
+        border-color: #3d8c5e;
+        transform: translateX(3px);
+    }
+    .btn-primary.pagination-btn.disabled {
+        background-color: #a0a0a0;
+        border-color: #a0a0a0;
+        cursor: not-allowed;
+        transform: none;
+        opacity: 0.6;
+    }
+    .btn-secondary.pagination-btn {
+        background-color: #6c757d;
+        border-color: #6c757d;
+    }
+    .btn-secondary.pagination-btn:hover:not(.disabled) {
+        background-color: #5a6268;
+        border-color: #5a6268;
+        transform: translateX(-3px);
+    }
+    .btn-secondary.pagination-btn.disabled {
+        background-color: #a0a0a0;
+        border-color: #a0a0a0;
+        cursor: not-allowed;
+        transform: none;
+        opacity: 0.6;
+    }
+    .page-info {
+        font-size: 1rem;
+        color: #495057;
+        font-weight: 500;
+    }
+    #pagination {
+        gap: 10px;
+    }
     @media (max-width: 768px) {
         .config-item {
             padding: 15px;
+            min-height: 280px;
         }
         .config-item h5 {
             font-size: 1.1rem;
         }
-        .config-item p {
+        .company-details p {
             font-size: 0.85rem;
         }
         .btn-outline-primary, .btn-outline-danger {
             font-size: 0.75rem;
             padding: 4px 8px;
+        }
+        .pagination-btn {
+            padding: 6px 15px;
+            font-size: 0.9rem;
+            min-width: 100px;
+        }
+        .d-flex {
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+        }
+        .d-flex .form-control {
+            width: 100%;
+        }
+        .d-flex .btn {
+            width: 100%;
+            max-width: 200px;
+        }
+        #pagination {
+            flex-direction: column;
+            gap: 10px;
+            text-align: center;
+        }
+        .page-info {
+            font-size: 0.9rem;
         }
     }
 </style>
@@ -243,49 +427,102 @@ $company_result = $conn->query($company_sql);
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js" integrity="sha384-geWF76RCwLtnZ8qwWowPQNguL3RmwHVBC9FhGdlKrxdiJJigb/j/68SIy3Te4Bkz" crossorigin="anonymous"></script>
 <script>
     $(document).ready(function() {
-        // Ensure dropdown works on click
-        $('.dropdown-toggle').on('click', function(e) {
-            e.preventDefault();
-            $(this).next('.dropdown-menu').toggleClass('show');
-        });
+        // Get initial search term from URL
+        let searchTerm = '<?php echo addslashes($search_term); ?>';
+        let currentPage = <?php echo $page; ?>;
 
-        // Close dropdown when clicking outside
-        $(document).on('click', function(e) {
-            if (!$(e.target).closest('.dropdown').length) {
-                $('.dropdown-menu').removeClass('show');
+        // Function to load companies via AJAX
+        function loadCompanies(page) {
+            currentPage = page;
+            const search = $('#searchInput').val();
+
+            // Show loading state
+            $('#company_list').html('<div class="text-center"><i class="fas fa-spinner fa-spin fa-2x"></i> Loading...</div>');
+
+            $.ajax({
+                url: 'search_companies.php',
+                type: 'GET',
+                data: {
+                    search: search,
+                    page: page
+                },
+                dataType: 'json',
+                success: function(response) {
+                    $('#company_list').html(response.company_list);
+                    $('#pagination').html(response.pagination);
+
+                    // Rebind click events for pagination buttons
+                    bindPaginationEvents();
+                },
+                error: function(xhr, status, error) {
+                    console.error('AJAX Error:', status, error);
+                    console.error('Response Text:', xhr.responseText);
+                    $('#company_list').html('<div class="alert alert-danger text-center" role="alert">Error loading companies. Please try again.</div>');
+                }
+            });
+        }
+
+        // Function to bind pagination events
+        function bindPaginationEvents() {
+            $('.pagination-btn').off('click').on('click', function(e) {
+                e.preventDefault();
+                if ($(this).hasClass('disabled')) {
+                    return false;
+                }
+                const page = $(this).data('page');
+                if (page) {
+                    loadCompanies(page);
+
+                    // Update URL without reloading the page
+                    const url = new URL(window.location);
+                    if (searchTerm) {
+                        url.searchParams.set('search', searchTerm);
+                    } else {
+                        url.searchParams.delete('search');
+                    }
+                    url.searchParams.set('page', page);
+                    window.history.pushState({}, '', url);
+                }
+            });
+        }
+
+        // Initial binding of pagination events
+        bindPaginationEvents();
+
+        // Live search on input
+        $('#searchInput').on('input', function() {
+            searchTerm = $(this).val();
+            currentPage = 1; // Reset to first page on new search
+            loadCompanies(currentPage);
+
+            // Update URL without reloading the page
+            const url = new URL(window.location);
+            if (searchTerm) {
+                url.searchParams.set('search', searchTerm);
+            } else {
+                url.searchParams.delete('search');
             }
+            url.searchParams.set('page', currentPage);
+            window.history.pushState({}, '', url);
         });
 
-        // TIN number formatting and validation
+        // TIN formatting (XXX-XXX-XXX) without validation
         $('#company_tin').on('input', function() {
-            var value = $(this).val().replace(/[^0-9]/g, ''); // Remove non-digits
-            if (value.length > 9) value = value.substring(0, 9); // Limit to 9 digits
+            var value = $(this).val().replace(/[^0-9]/g, '');
+            if (value.length > 9) value = value.substring(0, 9);
             if (value.length > 6) {
                 value = value.substring(0, 3) + '-' + value.substring(3, 6) + '-' + value.substring(6);
             } else if (value.length > 3) {
                 value = value.substring(0, 3) + '-' + value.substring(3);
             }
             $(this).val(value);
-
-            // Validate format
-            if (value.length === 11) { // 9 digits + 2 dashes
-                if (!/^\d{3}-\d{3}-\d{3}$/.test(value)) {
-                    $(this).addClass('is-invalid');
-                } else {
-                    $(this).removeClass('is-invalid');
-                }
-            } else {
-                $(this).addClass('is-invalid');
-            }
         });
 
-        // Contact number validation
         $('#company_contact_number').on('input', function() {
-            var value = $(this).val().replace(/[^0-9]/g, ''); // Remove non-digits
-            if (value.length > 11) value = value.substring(0, 11); // Limit to 11 digits
+            var value = $(this).val().replace(/[^0-9]/g, '');
+            if (value.length > 11) value = value.substring(0, 11);
             $(this).val(value);
 
-            // Validate length
             if (value.length > 0) {
                 if (value.length !== 11) {
                     $(this).addClass('is-invalid');
@@ -293,11 +530,26 @@ $company_result = $conn->query($company_sql);
                     $(this).removeClass('is-invalid');
                 }
             } else {
-                $(this).removeClass('is-invalid'); // Optional field, no error if empty
+                $(this).removeClass('is-invalid');
             }
         });
 
-        // Check for duplicate company name via AJAX
+        $('#telephone').on('input', function() {
+            var value = $(this).val().replace(/[^0-9]/g, '');
+            if (value.length > 20) value = value.substring(0, 20);
+            $(this).val(value);
+
+            if (value.length > 0) {
+                if (!/^\d{1,20}$/.test(value)) {
+                    $(this).addClass('is-invalid');
+                } else {
+                    $(this).removeClass('is-invalid');
+                }
+            } else {
+                $(this).removeClass('is-invalid');
+            }
+        });
+
         $('#company_name').on('blur', function() {
             var companyName = $(this).val().trim();
             if (companyName) {
@@ -320,22 +572,12 @@ $company_result = $conn->query($company_sql);
             }
         });
 
-        // Form submission validation
         $('#addCompanyForm').on('submit', function(e) {
-            var tin = $('#company_tin').val();
             var contact = $('#company_contact_number').val();
+            var telephone = $('#telephone').val();
             var companyName = $('#company_name').val().trim();
             var isDuplicate = $('#company_name').data('duplicate');
 
-            // Validate TIN number
-            if (!/^\d{3}-\d{3}-\d{3}$/.test(tin)) {
-                e.preventDefault();
-                alert('TIN Number must be in the format XXX-XXX-XXX (9 digits total)');
-                $('#company_tin').addClass('is-invalid');
-                return;
-            }
-
-            // Validate contact number
             if (contact.length > 0 && contact.length !== 11) {
                 e.preventDefault();
                 alert('Contact Number must be exactly 11 digits');
@@ -343,15 +585,30 @@ $company_result = $conn->query($company_sql);
                 return;
             }
 
-            // Check for duplicate company name
+            if (telephone.length > 0 && !/^\d{1,20}$/.test(telephone)) {
+                e.preventDefault();
+                alert('Telephone Number must contain only digits and be up to 20 characters');
+                $('#telephone').addClass('is-invalid');
+                return;
+            }
+
             if (isDuplicate && !$(this).data('confirmed')) {
                 e.preventDefault();
                 if (confirm("A company with the name '" + companyName + "' already exists. Do you want to continue adding this company?")) {
                     $(this).data('confirmed', true);
-                    $(this).submit(); // Resubmit the form
+                    $(this).submit();
                 }
             }
         });
+
+        // Handle browser back/forward navigation
+        window.onpopstate = function(event) {
+            const urlParams = new URLSearchParams(window.location.search);
+            searchTerm = urlParams.get('search') || '';
+            currentPage = parseInt(urlParams.get('page')) || 1;
+            $('#searchInput').val(searchTerm);
+            loadCompanies(currentPage);
+        };
     });
 </script>
 

@@ -61,60 +61,110 @@
             padding: 3px 6px;
         }
 
-        /* Sidebar */
-        #sidebar {
-            position: fixed;
-            top: 60px;
-            left: 0;
-            height: calc(100vh - 60px);
-            width: 60px;
-            background-color: #2a6041;
-            transition: width 0.3s ease;
-            overflow-y: auto;
-            overflow-x: hidden;
-            z-index: 1050;
-            display: flex;
-            flex-direction: column;
-        }
-        #sidebar:hover {
-            width: 220px;
-        }
-        #sidebar ul {
-            list-style: none;
-            padding: 0;
-            margin: 0;
-            flex-grow: 1;
-            display: flex;
-            flex-direction: column;
-        }
-        #sidebar li {
-            padding: 10px;
-        }
-        #sidebar a {
-            display: flex;
-            align-items: center;
-            color: #ffffff;
-            text-decoration: none;
-            padding: 10px;
-            transition: background-color 0.2s ease;
-        }
-        #sidebar a i {
-            font-size: 1.25rem;
-            width: 40px;
-            text-align: center;
-            flex-shrink: 0;
-        }
-        #sidebar a span {
-            opacity: 0;
-            transition: opacity 0.3s ease;
-            white-space: nowrap;
-        }
-        #sidebar:hover a span {
-            opacity: 1;
-        }
-        #sidebar a:hover {
-            background-color: #3d8c5e;
-        }
+/* Sidebar */
+#sidebar {
+    position: fixed;
+    top: 60px;
+    left: 0;
+    height: calc(100vh - 60px);
+    width: 60px;
+    background-color: #2a6041;
+    transition: width 0.3s ease;
+    overflow-y: auto;
+    overflow-x: hidden;
+    z-index: 1050;
+    display: flex;
+    flex-direction: column;
+}
+#sidebar:hover {
+    width: 250px; /* Increased width to accommodate text */
+}
+#sidebar ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+}
+#sidebar li {
+    padding: 5px 0; /* Reduced padding to save space */
+}
+#sidebar a {
+    display: flex;
+    align-items: center;
+    color: #ffffff;
+    text-decoration: none;
+    padding: 8px 10px; /* Adjusted padding for better spacing */
+    transition: background-color 0.2s ease;
+}
+#sidebar a i {
+    font-size: 1.25rem;
+    width: 40px;
+    text-align: center;
+    flex-shrink: 0;
+}
+#sidebar a span {
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    font-size: 0.9rem; /* Slightly smaller font size to prevent overflow */
+    white-space: normal; /* Allow text to wrap if needed */
+    max-width: 160px; /* Restrict text width to prevent overflow */
+}
+#sidebar:hover a span {
+    opacity: 1;
+}
+#sidebar a:hover {
+    background-color: #3d8c5e;
+}
+
+/* Dropdown in Sidebar */
+#sidebar .dropdown {
+    position: relative;
+}
+#sidebar .dropdown-toggle {
+    display: flex;
+    align-items: center;
+    color: #ffffff;
+    text-decoration: none;
+    padding: 8px 10px;
+    transition: background-color 0.2s ease;
+    cursor: pointer;
+}
+#sidebar .dropdown-toggle:hover {
+    background-color: #3d8c5e;
+}
+#sidebar .dropdown-menu {
+    background-color: #3d8c5e;
+    border: none;
+    margin-left: 50px;
+    margin-top: -5px;
+    padding: 0;
+    width: 190px; /* Adjusted to fit within expanded sidebar */
+    z-index: 1060;
+    position: absolute;
+    display: none;
+}
+#sidebar .dropdown-menu.show {
+    display: block;
+}
+#sidebar .dropdown-menu a {
+    color: #ffffff;
+    padding: 8px 15px;
+    font-size: 0.85rem; /* Smaller font for dropdown items */
+    white-space: normal; /* Allow dropdown text to wrap */
+}
+#sidebar .dropdown-menu a:hover {
+    background-color: #4a9f6f;
+}
+#sidebar .dropdown-toggle::after {
+    margin-left: auto;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+#sidebar:hover .dropdown-toggle::after {
+    opacity: 1;
+}
 
         /* Dropdown in Sidebar */
         #sidebar .dropdown {
@@ -230,15 +280,11 @@
             <li><a href="products.php"><i class="fas fa-box"></i> <span>Products</span></a></li>
             <li><a href="pos.php"><i class="fas fa-calculator"></i> <span>POS</span></a></li>
             <li><a href="reports.php"><i class="fas fa-chart-bar"></i> <span>Reports</span></a></li>
-            <li class="dropdown">
-                <a href="#" class="dropdown-toggle" id="configDropdown" data-bs-toggle="dropdown" aria-expanded="false">
-                    <i class="fas fa-cog"></i> <span>Configuration</span>
-                </a>
-                <ul class="dropdown-menu" aria-labelledby="configDropdown">
-                    <li><a href="price_configuration.php">Price Configuration</a></li>
-                    <li><a href="manage_companies.php">Manage Companies</a></li>
-                </ul>
-            </li>
+            
+            <li><a href="price_configuration.php"><i class="fas fa-tag"></i> <span>Price Configuration</span></a></li>
+            <li><a href="manage_companies.php"><i class="fas fa-building"></i> <span>Manage Companies</span></a></li>
+
+
             <li><a href="upload_receipt.php"><i class="fas fa-upload"></i> <span>Upload Receipt</span></a></li>
             <li><a href="view_receipts.php"><i class="fas fa-receipt"></i> <span>View Receipt</span></a></li>
             <li><a href="logout.php"><i class="fas fa-sign-out-alt"></i> <span>Logout</span></a></li>

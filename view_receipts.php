@@ -5,7 +5,7 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] != 'admin') {
     exit;
 }
 include 'db.php';
-include 'header.php'; // Includes navbar, sidebar, and styles
+include 'header.php';
 
 // Fetch companies for dropdown
 $company_sql = "SELECT company_id, name FROM companies ORDER BY name";
@@ -21,19 +21,19 @@ $selected_tax_type = isset($_GET['tax_type']) ? trim($_GET['tax_type']) : '';
 $po_search = isset($_GET['po_search']) ? trim($_GET['po_search']) : '';
 
 if ($selected_company_id > 0 && in_array($selected_tax_type, ['inclusive', 'exclusive'])) {
-    $sql = "SELECT r.receipt_id, r.file_name, r.dr_file_name, r.po_file_name, r.upload_date, r.tax_type, c.name AS company_name 
+    $sql = "SELECT r.receipt_id, r.file_name, r.dr_file_name, r.po_file_name, r.po_number, r.upload_date, r.tax_type, c.name AS company_name 
             FROM receipts r 
             JOIN companies c ON r.company_id = c.company_id 
             WHERE r.company_id = ? AND r.tax_type = ?";
     if (!empty($po_search)) {
-        $sql .= " AND (r.po_file_name LIKE ? OR r.file_name LIKE ? OR r.dr_file_name LIKE ?)";
+        $sql .= " AND (r.po_number LIKE ? OR r.file_name LIKE ? OR r.dr_file_name LIKE ? OR r.po_file_name LIKE ?)";
     }
     $sql .= " ORDER BY r.upload_date DESC";
     
     $stmt = $conn->prepare($sql);
     if (!empty($po_search)) {
         $po_like = "%$po_search%";
-        $stmt->bind_param("issss", $selected_company_id, $selected_tax_type, $po_like, $po_like, $po_like);
+        $stmt->bind_param("isssss", $selected_company_id, $selected_tax_type, $po_like, $po_like, $po_like, $po_like);
     } else {
         $stmt->bind_param("is", $selected_company_id, $selected_tax_type);
     }
@@ -62,6 +62,7 @@ if ($selected_company_id > 0 && in_array($selected_tax_type, ['inclusive', 'excl
                                 <option value="" <?php echo $selected_company_id == 0 ? 'selected' : ''; ?>>Select a company</option>
                                 <?php 
                                 if ($company_result->num_rows > 0) {
+                                    $company_result->data_seek(0); // Reset pointer
                                     while ($company = $company_result->fetch_assoc()): ?>
                                         <option value="<?php echo $company['company_id']; ?>" <?php echo $selected_company_id == $company['company_id'] ? 'selected' : ''; ?>>
                                             <?php echo htmlspecialchars($company['name']); ?>
@@ -105,10 +106,13 @@ if ($selected_company_id > 0 && in_array($selected_tax_type, ['inclusive', 'excl
                             <table class="table">
                                 <thead>
                                     <tr>
-                                        <th>Sales Invoioie</th>
-                                        <th>Receipt</th>
+                                        <th>Receipt ID</th>
+                                        <?php if ($selected_tax_type === 'inclusive'): ?>
+                                            <th>Sales Invoice</th>
+                                        <?php endif; ?>
                                         <th>Delivery Receipt</th>
                                         <th>Purchase Order</th>
+                                        <th>PO Number</th>
                                         <th>Upload Date</th>
                                         <th>Tax Type</th>
                                         <th>Actions</th>
@@ -118,23 +122,26 @@ if ($selected_company_id > 0 && in_array($selected_tax_type, ['inclusive', 'excl
                                     <?php foreach ($receipts as $receipt): ?>
                                         <tr>
                                             <td><?php echo $receipt['receipt_id']; ?></td>
-                                            <td><?php echo $receipt['file_name'] ? htmlspecialchars($receipt['file_name']) : '<span class="text-muted">N/A</span>'; ?></td>
+                                            <?php if ($selected_tax_type === 'inclusive'): ?>
+                                                <td><?php echo $receipt['file_name'] ? htmlspecialchars($receipt['file_name']) : '<span class="text-muted">N/A</span>'; ?></td>
+                                            <?php endif; ?>
                                             <td><?php echo $receipt['dr_file_name'] ? htmlspecialchars($receipt['dr_file_name']) : '<span class="text-muted">N/A</span>'; ?></td>
                                             <td><?php echo $receipt['po_file_name'] ? htmlspecialchars($receipt['po_file_name']) : '<span class="text-muted">N/A</span>'; ?></td>
+                                            <td><?php echo $receipt['po_number'] ? htmlspecialchars($receipt['po_number']) : '<span class="text-muted">N/A</span>'; ?></td>
                                             <td><?php echo $receipt['upload_date']; ?></td>
                                             <td><?php echo ucfirst($receipt['tax_type']); ?></td>
                                             <td>
-                                                <?php if ($receipt['file_name']): ?>
-                                                    <a href="uploads/receipts/<?php echo htmlspecialchars($receipt['file_name']); ?>" target="_blank" class="btn btn-action btn-view" title="View Receipt"><i class="fas fa-eye"></i></a>
+                                                <?php if ($selected_tax_type === 'inclusive' && $receipt['file_name']): ?>
+                                                    <a href="Uploads/receipts/<?php echo htmlspecialchars($receipt['file_name']); ?>" target="_blank" class="btn btn-action btn-view" title="View Receipt"><i class="fas fa-eye"></i></a>
                                                 <?php endif; ?>
                                                 <?php if ($receipt['dr_file_name']): ?>
-                                                    <a href="uploads/receipts/<?php echo htmlspecialchars($receipt['dr_file_name']); ?>" target="_blank" class="btn btn-action btn-view" title="View Delivery Receipt"><i class="fas fa-eye"></i></a>
+                                                    <a href="Uploads/receipts/<?php echo htmlspecialchars($receipt['dr_file_name']); ?>" target="_blank" class="btn btn-action btn-view" title="View Delivery Receipt"><i class="fas fa-eye"></i></a>
                                                 <?php endif; ?>
                                                 <?php if ($receipt['po_file_name']): ?>
-                                                    <a href="uploads/receipts/<?php echo htmlspecialchars($receipt['po_file_name']); ?>" target="_blank" class="btn btn-action btn-view" title="View Purchase Order"><i class="fas fa-eye"></i></a>
+                                                    <a href="Uploads/receipts/<?php echo htmlspecialchars($receipt['po_file_name']); ?>" target="_blank" class="btn btn-action btn-view" title="View Purchase Order"><i class="fas fa-eye"></i></a>
                                                 <?php endif; ?>
-                                                <?php if ($receipt['file_name'] || $receipt['dr_file_name'] || $receipt['po_file_name']): ?>
-                                                    <a href="uploads/receipts/<?php echo htmlspecialchars($receipt['file_name'] ?: $receipt['dr_file_name'] ?: $receipt['po_file_name']); ?>" download class="btn btn-action btn-download" title="Download"><i class="fas fa-download"></i></a>
+                                                <?php if ($receipt['dr_file_name'] || $receipt['po_file_name'] || ($selected_tax_type === 'inclusive' && $receipt['file_name'])): ?>
+                                                    <a href="Uploads/receipts/<?php echo htmlspecialchars($receipt['file_name'] ?: $receipt['dr_file_name'] ?: $receipt['po_file_name']); ?>" download class="btn btn-action btn-download" title="Download"><i class="fas fa-download"></i></a>
                                                 <?php endif; ?>
                                             </td>
                                         </tr>
@@ -238,13 +245,24 @@ if ($selected_company_id > 0 && in_array($selected_tax_type, ['inclusive', 'excl
         color: #34495e;
         word-wrap: break-word;
     }
-    .table th:nth-child(1), .table td:nth-child(1) { width: 10%; }
-    .table th:nth-child(2), .table td:nth-child(2) { width: 18%; }
-    .table th:nth-child(3), .table td:nth-child(3) { width: 18%; }
-    .table th:nth-child(4), .table td:nth-child(4) { width: 18%; }
-    .table th:nth-child(5), .table td:nth-child(5) { width: 15%; }
-    .table th:nth-child(6), .table td:nth-child(6) { width: 10%; }
-    .table th:nth-child(7), .table td:nth-child(7) { width: 15%; min-width: 120px; }
+    /* Adjusted column widths */
+    .table th:nth-child(1), .table td:nth-child(1) { width: 8%; } /* Receipt ID */
+    <?php if ($selected_tax_type === 'inclusive'): ?>
+        .table th:nth-child(2), .table td:nth-child(2) { width: 18%; } /* Sales Invoice */
+        .table th:nth-child(3), .table td:nth-child(3) { width: 18%; } /* Delivery Receipt */
+        .table th:nth-child(4), .table td:nth-child(4) { width: 18%; } /* Purchase Order */
+        .table th:nth-child(5), .table td:nth-child(5) { width: 10%; } /* PO Number */
+        .table th:nth-child(6), .table td:nth-child(6) { width: 15%; } /* Upload Date */
+        .table th:nth-child(7), .table td:nth-child(7) { width: 10%; } /* Tax Type */
+        .table th:nth-child(8), .table td:nth-child(8) { width: 15%; min-width: 120px; } /* Actions */
+    <?php else: ?>
+        .table th:nth-child(2), .table td:nth-child(2) { width: 20%; } /* Delivery Receipt */
+        .table th:nth-child(3), .table td:nth-child(3) { width: 20%; } /* Purchase Order */
+        .table th:nth-child(4), .table td:nth-child(4) { width: 12%; } /* PO Number */
+        .table th:nth-child(5), .table td:nth-child(5) { width: 15%; } /* Upload Date */
+        .table th:nth-child(6), .table td:nth-child(6) { width: 10%; } /* Tax Type */
+        .table th:nth-child(7), .table td:nth-child(7) { width: 15%; min-width: 120px; } /* Actions */
+    <?php endif; ?>
     .btn-action {
         border-radius: 8px;
         padding: 5px 10px;
@@ -291,7 +309,7 @@ if ($selected_company_id > 0 && in_array($selected_tax_type, ['inclusive', 'excl
         .card-body { padding: 20px; }
         .table td, .table th { font-size: 0.8rem; padding: 10px; }
         .btn-action { padding: 4px 8px; font-size: 0.75rem; margin-right: 2px; }
-        .table td:nth-child(7) { display: flex; flex-wrap: wrap; gap: 5px; }
+        .table td:nth-child(8) { display: flex; flex-wrap: wrap; gap: 5px; }
         .input-group { flex-direction: column; }
         .input-group .btn-primary { border-radius: 10px; margin-top: 10px; }
     }
