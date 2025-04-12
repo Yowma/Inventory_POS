@@ -279,6 +279,7 @@
             <li><a href="dashboard.php"><i class="fas fa-home"></i> <span>Home</span></a></li>
             <li><a href="products.php"><i class="fas fa-box"></i> <span>Products</span></a></li>
             <li><a href="pos.php"><i class="fas fa-calculator"></i> <span>POS</span></a></li>
+            <li><a href="pending_sales.php"><i class="fas fa-clock"></i> <span>Pending Sales</span></a></li>
             <li><a href="reports.php"><i class="fas fa-chart-bar"></i> <span>Reports</span></a></li>
             
             <li><a href="price_configuration.php"><i class="fas fa-tag"></i> <span>Price Configuration</span></a></li>
@@ -288,6 +289,7 @@
             <li><a href="upload_receipt.php"><i class="fas fa-upload"></i> <span>Upload Receipt</span></a></li>
             <li><a href="view_receipts.php"><i class="fas fa-receipt"></i> <span>View Receipt</span></a></li>
             <li><a href="logout.php"><i class="fas fa-sign-out-alt"></i> <span>Logout</span></a></li>
+
         </ul>
     </div>
     <?php endif; ?>

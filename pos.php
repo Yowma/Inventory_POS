@@ -207,7 +207,8 @@ $company_result = $conn->query($company_sql);
     </div>
 
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script>
 $(document).ready(function() {
     var cart = [];
 
@@ -238,14 +239,14 @@ $(document).ready(function() {
             var productId = $(this).data('id');
             var defaultPrice = parseFloat($(this).data('default-price'));
             var price = prices[productId] !== undefined ? parseFloat(prices[productId]) : defaultPrice;
-            if (isNaN(price)) price = defaultPrice; // Fallback to default if invalid
+            if (isNaN(price)) price = defaultPrice;
             $(this).data('price', price);
             $(this).find('.price-display').text(price.toFixed(2));
         });
         updateCart();
     }
 
-    // Fetch company-specific prices when company is selected
+    // Fetch company-specific prices
     $('#company_select').on('change', function() {
         var company_id = $(this).val();
         if (company_id) {
@@ -260,17 +261,17 @@ $(document).ready(function() {
                     } else {
                         alert('Error fetching prices: ' + response.error);
                         $('#company_select').val('');
-                        updateProductPrices({}); // Reset to default prices
+                        updateProductPrices({});
                     }
                 },
-                error: function(xhr, status, error) {
-                    alert('AJAX error: ' + error);
+                error: function() {
+                    alert('Error fetching prices.');
                     $('#company_select').val('');
-                    updateProductPrices({}); // Reset to default prices
+                    updateProductPrices({});
                 }
             });
         } else {
-            updateProductPrices({}); // Show default prices when no company is selected
+            updateProductPrices({});
         }
     });
 
@@ -395,7 +396,7 @@ $(document).ready(function() {
         $('#po_number_input').focus();
     });
 
-    // Submit sale with PO number and tax type
+    // Submit sale with PO number
     $('#submit_po').on('click', function() {
         var po_number = $('#po_number_input').val().trim();
         if (!po_number) {
@@ -416,21 +417,20 @@ $(document).ready(function() {
             dataType: 'json',
             success: function(response) {
                 if (response.success) {
-                    alert('Sale processed successfully');
-                    generateReceipt(response);
+                    alert('Sale submitted for approval.');
                     cart = [];
                     updateCart();
                     $('#company_select').val('');
                     $('#tax_type').val('');
                     $('#poModal').css('display', 'none');
                     $('#po_number_input').val('');
-                    location.reload();
+                    window.location.href = 'pending_sales.php';
                 } else {
                     alert('Error: ' + (response.error || 'Unknown error'));
                 }
             },
             error: function(xhr, status, error) {
-                alert('AJAX error: ' + error + '\nResponse: ' + xhr.responseText);
+                alert('Error: ' + error);
             }
         });
     });
@@ -439,29 +439,8 @@ $(document).ready(function() {
         $('#poModal').css('display', 'none');
         $('#po_number_input').val('');
     });
-
-    // Generate receipt
-    function generateReceipt(data) {
-        if (data.receipt_file) {
-            const invoiceWindow = window.open('Uploads/receipts/' + data.receipt_file, '_blank');
-            invoiceWindow.onload = function() {
-                invoiceWindow.print();
-            };
-        } else {
-            alert('Sales Invoice file not found');
-        }
-
-        if (data.dr_file) {
-            const drWindow = window.open('Uploads/receipts/' + data.dr_file, '_blank');
-            drWindow.onload = function() {
-                drWindow.print();
-            };
-        } else {
-            alert('Delivery Receipt file not found');
-        }
-    }
 });
-    </script>
+</script>
 </body>
 </html>
 <?php 

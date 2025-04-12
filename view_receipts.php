@@ -14,17 +14,18 @@ if (!$company_result) {
     die("Error fetching companies: " . $conn->error);
 }
 
-// Fetch receipts based on company, tax type, and PO number search
+// Fetch receipts based on company, tax type, status, and PO number search
 $receipts = [];
 $selected_company_id = isset($_GET['company_id']) ? (int)$_GET['company_id'] : 0;
 $selected_tax_type = isset($_GET['tax_type']) ? trim($_GET['tax_type']) : '';
+$selected_status = isset($_GET['status']) ? trim($_GET['status']) : 'approved';
 $po_search = isset($_GET['po_search']) ? trim($_GET['po_search']) : '';
 
-if ($selected_company_id > 0 && in_array($selected_tax_type, ['inclusive', 'exclusive'])) {
-    $sql = "SELECT r.receipt_id, r.file_name, r.dr_file_name, r.po_file_name, r.po_number, r.upload_date, r.tax_type, c.name AS company_name 
+if ($selected_company_id > 0 && in_array($selected_tax_type, ['inclusive', 'exclusive']) && in_array($selected_status, ['approved', 'canceled'])) {
+    $sql = "SELECT r.receipt_id, r.file_name, r.dr_file_name, r.po_file_name, r.po_number, r.upload_date, r.tax_type, r.status, c.name AS company_name 
             FROM receipts r 
             JOIN companies c ON r.company_id = c.company_id 
-            WHERE r.company_id = ? AND r.tax_type = ?";
+            WHERE r.company_id = ? AND r.tax_type = ? AND r.status = ?";
     if (!empty($po_search)) {
         $sql .= " AND (r.po_number LIKE ? OR r.file_name LIKE ? OR r.dr_file_name LIKE ? OR r.po_file_name LIKE ?)";
     }
@@ -33,9 +34,9 @@ if ($selected_company_id > 0 && in_array($selected_tax_type, ['inclusive', 'excl
     $stmt = $conn->prepare($sql);
     if (!empty($po_search)) {
         $po_like = "%$po_search%";
-        $stmt->bind_param("isssss", $selected_company_id, $selected_tax_type, $po_like, $po_like, $po_like, $po_like);
+        $stmt->bind_param("issssss", $selected_company_id, $selected_tax_type, $selected_status, $po_like, $po_like, $po_like, $po_like);
     } else {
-        $stmt->bind_param("is", $selected_company_id, $selected_tax_type);
+        $stmt->bind_param("iss", $selected_company_id, $selected_tax_type, $selected_status);
     }
     $stmt->execute();
     $result = $stmt->get_result();
@@ -56,13 +57,13 @@ if ($selected_company_id > 0 && in_array($selected_tax_type, ['inclusive', 'excl
             <div class="card-body">
                 <form method="GET" class="mb-4">
                     <div class="row align-items-end">
-                        <div class="col-md-4 mb-3">
+                        <div class="col-md-3 mb-3">
                             <label for="company_select" class="form-label">Select Company</label>
                             <select class="form-select" id="company_select" name="company_id" onchange="this.form.submit()">
                                 <option value="" <?php echo $selected_company_id == 0 ? 'selected' : ''; ?>>Select a company</option>
                                 <?php 
                                 if ($company_result->num_rows > 0) {
-                                    $company_result->data_seek(0); // Reset pointer
+                                    $company_result->data_seek(0);
                                     while ($company = $company_result->fetch_assoc()): ?>
                                         <option value="<?php echo $company['company_id']; ?>" <?php echo $selected_company_id == $company['company_id'] ? 'selected' : ''; ?>>
                                             <?php echo htmlspecialchars($company['name']); ?>
@@ -74,7 +75,7 @@ if ($selected_company_id > 0 && in_array($selected_tax_type, ['inclusive', 'excl
                                 ?>
                             </select>
                         </div>
-                        <div class="col-md-4 mb-3">
+                        <div class="col-md-3 mb-3">
                             <label for="tax_type" class="form-label">Tax Type</label>
                             <select class="form-select" id="tax_type" name="tax_type" onchange="this.form.submit()" <?php echo $selected_company_id == 0 ? 'disabled' : ''; ?>>
                                 <option value="" <?php echo empty($selected_tax_type) ? 'selected' : ''; ?>>Select tax type</option>
@@ -82,8 +83,15 @@ if ($selected_company_id > 0 && in_array($selected_tax_type, ['inclusive', 'excl
                                 <option value="exclusive" <?php echo $selected_tax_type == 'exclusive' ? 'selected' : ''; ?>>Tax Exclusive</option>
                             </select>
                         </div>
+                        <div class="col-md-3 mb-3">
+                            <label for="status" class="form-label">Status</label>
+                            <select class="form-select" id="status" name="status" onchange="this.form.submit()" <?php echo $selected_company_id == 0 ? 'disabled' : ''; ?>>
+                                <option value="approved" <?php echo $selected_status == 'approved' ? 'selected' : ''; ?>>Approved</option>
+                                <option value="canceled" <?php echo $selected_status == 'canceled' ? 'selected' : ''; ?>>Canceled</option>
+                            </select>
+                        </div>
                         <?php if ($selected_company_id > 0 && $selected_tax_type): ?>
-                            <div class="col-md-4 mb-3">
+                            <div class="col-md-3 mb-3">
                                 <label for="po_search" class="form-label">Search PO Number</label>
                                 <div class="input-group">
                                     <input type="text" class="form-control search-bar" id="po_search" name="po_search" value="<?php echo htmlspecialchars($po_search); ?>" placeholder="Enter PO Number">
@@ -94,12 +102,12 @@ if ($selected_company_id > 0 && in_array($selected_tax_type, ['inclusive', 'excl
                     </div>
                 </form>
 
-                <?php if ($selected_company_id > 0 && $selected_tax_type): ?>
-                    <h4 class="company-title">Receipts for <?php echo htmlspecialchars($receipts[0]['company_name'] ?? ''); ?> (<?php echo ucfirst($selected_tax_type); ?>)</h4>
+                <?php if ($selected_company_id > 0 && $selected_tax_type && $selected_status): ?>
+                    <h4 class="company-title">Receipts for <?php echo htmlspecialchars($receipts[0]['company_name'] ?? ''); ?> (<?php echo ucfirst($selected_tax_type); ?>, <?php echo ucfirst($selected_status); ?>)</h4>
                     <?php if (empty($receipts)): ?>
                         <div class="no-data">
                             <i class="fas fa-exclamation-circle fa-2x mb-2"></i>
-                            <p>No <?php echo $selected_tax_type; ?> receipts found for this company<?php echo !empty($po_search) ? " with PO number '$po_search'" : ''; ?>.</p>
+                            <p>No <?php echo $selected_tax_type; ?> <?php echo $selected_status; ?> receipts found for this company<?php echo !empty($po_search) ? " with PO number '$po_search'" : ''; ?>.</p>
                         </div>
                     <?php else: ?>
                         <div class="table-container">
@@ -107,43 +115,53 @@ if ($selected_company_id > 0 && in_array($selected_tax_type, ['inclusive', 'excl
                                 <thead>
                                     <tr>
                                         <th>Receipt ID</th>
-                                        <?php if ($selected_tax_type === 'inclusive'): ?>
+                                        <?php if ($selected_tax_type === 'inclusive' && $selected_status === 'approved'): ?>
                                             <th>Sales Invoice</th>
                                         <?php endif; ?>
-                                        <th>Delivery Receipt</th>
-                                        <th>Purchase Order</th>
+                                        <?php if ($selected_status === 'approved'): ?>
+                                            <th>Delivery Receipt</th>
+                                            <th>Purchase Order</th>
+                                        <?php endif; ?>
                                         <th>PO Number</th>
                                         <th>Upload Date</th>
                                         <th>Tax Type</th>
-                                        <th>Actions</th>
+                                        <th>Status</th>
+                                        <?php if ($selected_status === 'approved'): ?>
+                                            <th>Actions</th>
+                                        <?php endif; ?>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     <?php foreach ($receipts as $receipt): ?>
                                         <tr>
                                             <td><?php echo $receipt['receipt_id']; ?></td>
-                                            <?php if ($selected_tax_type === 'inclusive'): ?>
+                                            <?php if ($selected_tax_type === 'inclusive' && $selected_status === 'approved'): ?>
                                                 <td><?php echo $receipt['file_name'] ? htmlspecialchars($receipt['file_name']) : '<span class="text-muted">N/A</span>'; ?></td>
                                             <?php endif; ?>
-                                            <td><?php echo $receipt['dr_file_name'] ? htmlspecialchars($receipt['dr_file_name']) : '<span class="text-muted">N/A</span>'; ?></td>
-                                            <td><?php echo $receipt['po_file_name'] ? htmlspecialchars($receipt['po_file_name']) : '<span class="text-muted">N/A</span>'; ?></td>
+                                            <?php if ($selected_status === 'approved'): ?>
+                                                <td><?php echo $receipt['dr_file_name'] ? htmlspecialchars($receipt['dr_file_name']) : '<span class="text-muted">N/A</span>'; ?></td>
+                                                <td><?php echo $receipt['po_file_name'] ? htmlspecialchars($receipt['po_file_name']) : '<span class="text-muted">N/A</span>'; ?></td>
+                                            <?php endif; ?>
                                             <td><?php echo $receipt['po_number'] ? htmlspecialchars($receipt['po_number']) : '<span class="text-muted">N/A</span>'; ?></td>
                                             <td><?php echo $receipt['upload_date']; ?></td>
                                             <td><?php echo ucfirst($receipt['tax_type']); ?></td>
-                                            <td>
-                                                <?php if ($selected_tax_type === 'inclusive' && $receipt['file_name']): ?>
-                                                    <a href="Uploads/receipts/<?php echo htmlspecialchars($receipt['file_name']); ?>" target="_blank" class="btn btn-action btn-view" title="View Receipt"><i class="fas fa-eye"></i></a>
-                                                <?php endif; ?>
-                                                <?php if ($receipt['dr_file_name']): ?>
-                                                    <a href="Uploads/receipts/<?php echo htmlspecialchars($receipt['dr_file_name']); ?>" target="_blank" class="btn btn-action btn-view" title="View Delivery Receipt"><i class="fas fa-eye"></i></a>
-                                                <?php endif; ?>
-                                                <?php if ($receipt['po_file_name']): ?>
-                                                    <a href="Uploads/receipts/<?php echo htmlspecialchars($receipt['po_file_name']); ?>" target="_blank" class="btn btn-action btn-view" title="View Purchase Order"><i class="fas fa-eye"></i></a>
-                                                <?php endif; ?>
-                                                <?php if ($receipt['dr_file_name'] || $receipt['po_file_name'] || ($selected_tax_type === 'inclusive' && $receipt['file_name'])): ?>
-                                                    <a href="Uploads/receipts/<?php echo htmlspecialchars($receipt['file_name'] ?: $receipt['dr_file_name'] ?: $receipt['po_file_name']); ?>" download class="btn btn-action btn-download" title="Download"><i class="fas fa-download"></i></a>
-                                                <?php endif; ?>
-                                            </td>
+                                            <td><?php echo ucfirst($receipt['status']); ?></td>
+                                            <?php if ($selected_status === 'approved'): ?>
+                                                <td>
+                                                    <?php if ($selected_tax_type === 'inclusive' && $receipt['file_name']): ?>
+                                                        <a href="Uploads/receipts/<?php echo htmlspecialchars($receipt['file_name']); ?>" target="_blank" class="btn btn-action btn-view" title="View Receipt"><i class="fas fa-eye"></i></a>
+                                                    <?php endif; ?>
+                                                    <?php if ($receipt['dr_file_name']): ?>
+                                                        <a href="Uploads/receipts/<?php echo htmlspecialchars($receipt['dr_file_name']); ?>" target="_blank" class="btn btn-action btn-view" title="View Delivery Receipt"><i class="fas fa-eye"></i></a>
+                                                    <?php endif; ?>
+                                                    <?php if ($receipt['po_file_name']): ?>
+                                                        <a href="Uploads/receipts/<?php echo htmlspecialchars($receipt['po_file_name']); ?>" target="_blank" class="btn btn-action btn-view" title="View Purchase Order"><i class="fas fa-eye"></i></a>
+                                                    <?php endif; ?>
+                                                    <?php if ($receipt['dr_file_name'] || $receipt['po_file_name'] || ($selected_tax_type === 'inclusive' && $receipt['file_name'])): ?>
+                                                        <a href="Uploads/receipts/<?php echo htmlspecialchars($receipt['file_name'] ?: $receipt['dr_file_name'] ?: $receipt['po_file_name']); ?>" download class="btn btn-action btn-download" title="Download"><i class="fas fa-download"></i></a>
+                                                    <?php endif; ?>
+                                                </td>
+                                            <?php endif; ?>
                                         </tr>
                                     <?php endforeach; ?>
                                 </tbody>
@@ -153,7 +171,7 @@ if ($selected_company_id > 0 && in_array($selected_tax_type, ['inclusive', 'excl
                 <?php else: ?>
                     <div class="no-data">
                         <i class="fas fa-info-circle fa-2x mb-2"></i>
-                        <p>Please select a company and tax type to view its receipts.</p>
+                        <p>Please select a company, tax type, and status to view receipts.</p>
                     </div>
                 <?php endif; ?>
             </div>
@@ -165,7 +183,6 @@ if ($selected_company_id > 0 && in_array($selected_tax_type, ['inclusive', 'excl
 <script src="https://code.jquery.com/jquery-3.5.1.min.js" integrity="sha256-9/aliU8dGd2tb6OSsuzixeV4y/faTqgFtohetphbbj0=" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <style>
-    /* Existing styles remain unchanged */
     .card {
         border: none;
         border-radius: 20px;
@@ -245,23 +262,31 @@ if ($selected_company_id > 0 && in_array($selected_tax_type, ['inclusive', 'excl
         color: #34495e;
         word-wrap: break-word;
     }
-    /* Adjusted column widths */
-    .table th:nth-child(1), .table td:nth-child(1) { width: 8%; } /* Receipt ID */
-    <?php if ($selected_tax_type === 'inclusive'): ?>
-        .table th:nth-child(2), .table td:nth-child(2) { width: 18%; } /* Sales Invoice */
-        .table th:nth-child(3), .table td:nth-child(3) { width: 18%; } /* Delivery Receipt */
-        .table th:nth-child(4), .table td:nth-child(4) { width: 18%; } /* Purchase Order */
-        .table th:nth-child(5), .table td:nth-child(5) { width: 10%; } /* PO Number */
+    <?php if ($selected_tax_type === 'inclusive' && $selected_status === 'approved'): ?>
+        .table th:nth-child(1), .table td:nth-child(1) { width: 8%; } /* Receipt ID */
+        .table th:nth-child(2), .table td:nth-child(2) { width: 15%; } /* Sales Invoice */
+        .table th:nth-child(3), .table td:nth-child(3) { width: 15%; } /* Delivery Receipt */
+        .table th:nth-child(4), .table td:nth-child(4) { width: 15%; } /* Purchase Order */
+        .table th:nth-child(5), .table td:nth-child(5) { width: 12%; } /* PO Number */
         .table th:nth-child(6), .table td:nth-child(6) { width: 15%; } /* Upload Date */
         .table th:nth-child(7), .table td:nth-child(7) { width: 10%; } /* Tax Type */
-        .table th:nth-child(8), .table td:nth-child(8) { width: 15%; min-width: 120px; } /* Actions */
-    <?php else: ?>
-        .table th:nth-child(2), .table td:nth-child(2) { width: 20%; } /* Delivery Receipt */
-        .table th:nth-child(3), .table td:nth-child(3) { width: 20%; } /* Purchase Order */
-        .table th:nth-child(4), .table td:nth-child(4) { width: 12%; } /* PO Number */
+        .table th:nth-child(8), .table td:nth-child(8) { width: 10%; } /* Status */
+        .table th:nth-child(9), .table td:nth-child(9) { width: 15%; min-width: 120px; } /* Actions */
+    <?php elseif ($selected_status === 'approved'): ?>
+        .table th:nth-child(1), .table td:nth-child(1) { width: 8%; } /* Receipt ID */
+        .table th:nth-child(2), .table td:nth-child(2) { width: 18%; } /* Delivery Receipt */
+        .table th:nth-child(3), .table td:nth-child(3) { width: 18%; } /* Purchase Order */
+        .table th:nth-child(4), .table td:nth-child(4) { width: 15%; } /* PO Number */
         .table th:nth-child(5), .table td:nth-child(5) { width: 15%; } /* Upload Date */
         .table th:nth-child(6), .table td:nth-child(6) { width: 10%; } /* Tax Type */
-        .table th:nth-child(7), .table td:nth-child(7) { width: 15%; min-width: 120px; } /* Actions */
+        .table th:nth-child(7), .table td:nth-child(7) { width: 10%; } /* Status */
+        .table th:nth-child(8), .table td:nth-child(8) { width: 16%; min-width: 120px; } /* Actions */
+    <?php else: ?>
+        .table th:nth-child(1), .table td:nth-child(1) { width: 10%; } /* Receipt ID */
+        .table th:nth-child(2), .table td:nth-child(2) { width: 25%; } /* PO Number */
+        .table th:nth-child(3), .table td:nth-child(3) { width: 25%; } /* Upload Date */
+        .table th:nth-child(4), .table td:nth-child(4) { width: 20%; } /* Tax Type */
+        .table th:nth-child(5), .table td:nth-child(5) { width: 20%; } /* Status */
     <?php endif; ?>
     .btn-action {
         border-radius: 8px;
@@ -309,7 +334,7 @@ if ($selected_company_id > 0 && in_array($selected_tax_type, ['inclusive', 'excl
         .card-body { padding: 20px; }
         .table td, .table th { font-size: 0.8rem; padding: 10px; }
         .btn-action { padding: 4px 8px; font-size: 0.75rem; margin-right: 2px; }
-        .table td:nth-child(8) { display: flex; flex-wrap: wrap; gap: 5px; }
+        .table td:nth-child(9) { display: flex; flex-wrap: wrap; gap: 5px; }
         .input-group { flex-direction: column; }
         .input-group .btn-primary { border-radius: 10px; margin-top: 10px; }
     }

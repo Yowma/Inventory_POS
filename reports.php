@@ -164,7 +164,7 @@ while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
                 </form>
                 <?php if (isset($_POST['date'])): ?>
                     <div class="total-sales mt-4">
-                        Total Sales for <?php echo htmlspecialchars($selected_date); ?>: $<?php echo number_format($total_sales, 2); ?>
+                        Total Sales for <?php echo htmlspecialchars($selected_date); ?>: ₱ <?php echo number_format($total_sales, 2); ?>
                     </div>
                 <?php endif; ?>
             </div>
