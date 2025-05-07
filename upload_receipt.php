@@ -21,8 +21,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error = "Please select a company.";
     } elseif (!in_array($tax_type, ['inclusive', 'exclusive'])) {
         $error = "Please select a valid tax type.";
-    } elseif (empty($po_number)) {
-        $error = "Please select or enter a PO number.";
     } elseif (!$receipt_file && !$dr_file && !$po_file) {
         $error = "Please upload at least one PDF file.";
     } else {
@@ -78,52 +76,67 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $receipt_file_name = null;
             }
 
-            // Check if the PO number already exists in the receipts table
-            $stmt = $conn->prepare("SELECT receipt_id, file_name, dr_file_name, po_file_name, company_id, tax_type FROM receipts WHERE po_number = ?");
-            $stmt->bind_param("s", $po_number);
-            $stmt->execute();
-            $result = $stmt->get_result();
-            $existing_receipt = $result->fetch_assoc();
-            $stmt->close();
+            if ($po_number) {
+                // Check if the PO number already exists in the receipts table
+                $stmt = $conn->prepare("SELECT receipt_id, file_name, dr_file_name, po_file_name, company_id, tax_type FROM receipts WHERE po_number = ?");
+                $stmt->bind_param("s", $po_number);
+                $stmt->execute();
+                $result = $stmt->get_result();
+                $existing_receipt = $result->fetch_assoc();
+                $stmt->close();
 
-            if ($existing_receipt) {
-                // PO number exists, update the existing row
-                $existing_receipt_id = $existing_receipt['receipt_id'];
-                $existing_file_name = $existing_receipt['file_name'];
-                $existing_dr_file_name = $existing_receipt['dr_file_name'];
-                $existing_po_file_name = $existing_receipt['po_file_name'];
-                $existing_company_id = $existing_receipt['company_id'];
-                $existing_tax_type = $existing_receipt['tax_type'];
+                if ($existing_receipt) {
+                    // PO number exists, update the existing row
+                    $existing_receipt_id = $existing_receipt['receipt_id'];
+                    $existing_file_name = $existing_receipt['file_name'];
+                    $existing_dr_file_name = $existing_receipt['dr_file_name'];
+                    $existing_po_file_name = $existing_receipt['po_file_name'];
+                    $existing_company_id = $existing_receipt['company_id'];
+                    $existing_tax_type = $existing_receipt['tax_type'];
 
-                // Validate company_id and tax_type match
-                if ($existing_company_id != $company_id) {
-                    $error = "The selected PO number is associated with a different company.";
-                } elseif ($existing_tax_type != $tax_type) {
-                    $error = "The selected PO number has a different tax type.";
-                } else {
-                    // Update only the fields that have new uploads, preserve existing ones
-                    $new_receipt_file_name = $receipt_file_name ?? $existing_file_name;
-                    $new_dr_file_name = $dr_file_name ?? $existing_dr_file_name;
-                    $new_po_file_name = $po_file_name ?? $existing_po_file_name;
-
-                    // If new files are uploaded and old ones exist, delete the old files
-                    if ($receipt_file_name && $existing_file_name) {
-                        unlink($upload_dir . $existing_file_name);
-                    }
-                    if ($dr_file_name && $existing_dr_file_name) {
-                        unlink($upload_dir . $existing_dr_file_name);
-                    }
-                    if ($po_file_name && $existing_po_file_name) {
-                        unlink($upload_dir . $existing_po_file_name);
-                    }
-
-                    $stmt = $conn->prepare("UPDATE receipts SET file_name = ?, dr_file_name = ?, po_file_name = ? WHERE receipt_id = ?");
-                    $stmt->bind_param("sssi", $new_receipt_file_name, $new_dr_file_name, $new_po_file_name, $existing_receipt_id);
-                    if ($stmt->execute()) {
-                        $success = "Documents updated successfully for PO number $po_number.";
+                    // Validate company_id and tax_type match
+                    if ($existing_company_id != $company_id) {
+                        $error = "The selected PO number is associated with a different company.";
+                    } elseif ($existing_tax_type != $tax_type) {
+                        $error = "The selected PO number has a different tax type.";
                     } else {
-                        $error = "Failed to update database: " . $conn->error;
-                        // Rollback file uploads
+                        // Update only the fields that have new uploads, preserve existing ones
+                        $new_receipt_file_name = $receipt_file_name ?? $existing_file_name;
+                        $new_dr_file_name = $dr_file_name ?? $existing_dr_file_name;
+                        $new_po_file_name = $po_file_name ?? $existing_po_file_name;
+
+                        // If new files are uploaded and old ones exist, delete the old files
+                        if ($receipt_file_name && $existing_file_name) {
+                            unlink($upload_dir . $existing_file_name);
+                        }
+                        if ($dr_file_name && $existing_dr_file_name) {
+                            unlink($upload_dir . $existing_dr_file_name);
+                        }
+                        if ($po_file_name && $existing_po_file_name) {
+                            unlink($upload_dir . $existing_po_file_name);
+                        }
+
+                        $stmt = $conn->prepare("UPDATE receipts SET file_name = ?, dr_file_name = ?, po_file_name = ? WHERE receipt_id = ?");
+                        $stmt->bind_param("sssi", $new_receipt_file_name, $new_dr_file_name, $new_po_file_name, $existing_receipt_id);
+                        if ($stmt->execute()) {
+                            $success = "Documents updated successfully.";
+                        } else {
+                            $error = "Failed to update database: " . $conn->error;
+                            // Rollback file uploads
+                            if ($receipt_file_name) unlink($upload_dir . $receipt_file_name);
+                            if ($dr_file_name) unlink($upload_dir . $dr_file_name);
+                            if ($po_file_name) unlink($upload_dir . $po_file_name);
+                        }
+                        $stmt->close();
+                    }
+                } else {
+                    // PO number doesn't exist, insert a new row
+                    $stmt = $conn->prepare("INSERT INTO receipts (company_id, file_name, dr_file_name, po_file_name, po_number, tax_type, upload_date) VALUES (?, ?, ?, ?, ?, ?, NOW())");
+                    $stmt->bind_param("isssss", $company_id, $receipt_file_name, $dr_file_name, $po_file_name, $po_number, $tax_type);
+                    if ($stmt->execute()) {
+                        $success = "Documents uploaded successfully.";
+                    } else {
+                        $error = "Failed to save to database: " . $conn->error;
                         if ($receipt_file_name) unlink($upload_dir . $receipt_file_name);
                         if ($dr_file_name) unlink($upload_dir . $dr_file_name);
                         if ($po_file_name) unlink($upload_dir . $po_file_name);
@@ -131,11 +144,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $stmt->close();
                 }
             } else {
-                // PO number doesn't exist, insert a new row
+                // No PO number, insert a new row
                 $stmt = $conn->prepare("INSERT INTO receipts (company_id, file_name, dr_file_name, po_file_name, po_number, tax_type, upload_date) VALUES (?, ?, ?, ?, ?, ?, NOW())");
-                $stmt->bind_param("isssss", $company_id, $receipt_file_name, $dr_file_name, $po_file_name, $po_number, $tax_type);
+                $null_po = null; // Handle empty PO number
+                $stmt->bind_param("isssss", $company_id, $receipt_file_name, $dr_file_name, $po_file_name, $null_po, $tax_type);
                 if ($stmt->execute()) {
-                    $success = "Documents uploaded successfully for PO number $po_number.";
+                    $success = "Documents uploaded successfully.";
                 } else {
                     $error = "Failed to save to database: " . $conn->error;
                     if ($receipt_file_name) unlink($upload_dir . $receipt_file_name);
@@ -153,13 +167,6 @@ $company_sql = "SELECT company_id, name FROM companies ORDER BY name";
 $company_result = $conn->query($company_sql);
 if (!$company_result) {
     die("Error fetching companies: " . $conn->error);
-}
-
-// Fetch distinct PO numbers for dropdown
-$po_sql = "SELECT DISTINCT po_number FROM receipts WHERE po_number IS NOT NULL AND po_number != '' ORDER BY po_number";
-$po_result = $conn->query($po_sql);
-if (!$po_result) {
-    die("Error fetching PO numbers: " . $conn->error);
 }
 ?>
 
@@ -208,21 +215,10 @@ if (!$po_result) {
                                 </select>
                             </div>
                             <div class="mb-4">
-                                <label for="po_number" class="form-label">PO Number</label>
+                                <label for="po_number" class="form-label">PO Number (Optional)</label>
                                 <div class="input-group">
                                     <select class="form-select" id="po_select" name="po_number_select">
                                         <option value="" selected>Select an existing PO number</option>
-                                        <?php 
-                                        if ($po_result->num_rows > 0) {
-                                            while ($po = $po_result->fetch_assoc()): ?>
-                                                <option value="<?php echo htmlspecialchars($po['po_number']); ?>">
-                                                    <?php echo htmlspecialchars($po['po_number']); ?>
-                                                </option>
-                                            <?php endwhile;
-                                        } else {
-                                            echo '<option value="" disabled>No PO numbers available</option>';
-                                        }
-                                        ?>
                                     </select>
                                     <input type="text" class="form-control" id="po_number_input" name="po_number" placeholder="Or enter a new PO number">
                                 </div>
@@ -266,6 +262,37 @@ $(document).ready(function() {
         }
     });
 
+    // Fetch PO numbers when company is selected
+    $('#company_select').change(function() {
+        var companyId = $(this).val();
+        if (companyId) {
+            $.ajax({
+                url: 'fetch_po_numbers.php',
+                method: 'POST',
+                data: { company_id: companyId },
+                dataType: 'json',
+                success: function(response) {
+                    var $poSelect = $('#po_select');
+                    $poSelect.empty();
+                    $poSelect.append('<option value="" selected>Select an existing PO number</option>');
+                    if (response.length > 0) {
+                        $.each(response, function(index, po) {
+                            $poSelect.append('<option value="' + po.po_number + '">' + po.po_number + '</option>');
+                        });
+                    } else {
+                        $poSelect.append('<option value="" disabled>No PO numbers available</option>');
+                    }
+                },
+                error: function() {
+                    alert('Failed to fetch PO番号.');
+                }
+            });
+        } else {
+            $('#po_select').empty().append('<option value="" selected>Select an existing PO number</option>');
+        }
+        $('#po_number_input').val(''); // Clear input on company change
+    });
+
     // Handle PO number selection
     $('#po_select').change(function() {
         var selectedPo = $(this).val();
@@ -276,19 +303,12 @@ $(document).ready(function() {
         }
     });
 
-    // Ensure that the form submits the manual input if provided
+    // Validate form on submit
     $('#uploadForm').on('submit', function(e) {
         var taxType = $('#tax_type').val();
         var receiptFile = $('#receipt_pdf')[0].files.length;
         var drFile = $('#dr_pdf')[0].files.length;
         var poFile = $('#po_pdf')[0].files.length;
-        var poNumber = $('#po_number_input').val().trim();
-
-        if (!poNumber) {
-            e.preventDefault();
-            alert('Please select or enter a PO number.');
-            return false;
-        }
 
         if (taxType === 'inclusive' && !receiptFile && !drFile && !poFile) {
             e.preventDefault();
