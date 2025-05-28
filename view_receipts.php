@@ -158,7 +158,7 @@ if ($selected_company_id > 0 && in_array($selected_tax_type, ['inclusive', 'excl
                                                         <a href="Uploads/receipts/<?php echo htmlspecialchars($receipt['po_file_name']); ?>" target="_blank" class="btn btn-action btn-view" title="View Purchase Order"><i class="fas fa-eye"></i></a>
                                                     <?php endif; ?>
                                                     <?php if ($receipt['dr_file_name'] || $receipt['po_file_name'] || ($selected_tax_type === 'inclusive' && $receipt['file_name'])): ?>
-                                                        <a href="Uploads/receipts/<?php echo htmlspecialchars($receipt['file_name'] ?: $receipt['dr_file_name'] ?: $receipt['po_file_name']); ?>" download class="btn btn-action btn-download" title="Download"><i class="fas fa-download"></i></a>
+                                                        <a href="download_receipts.php?receipt_id=<?php echo $receipt['receipt_id']; ?>" class="btn btn-action btn-download" title="Download All Files"><i class="fas fa-download"></i></a>
                                                     <?php endif; ?>
                                                 </td>
                                             <?php endif; ?>

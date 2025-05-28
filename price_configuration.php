@@ -1,318 +1,346 @@
 <?php
 session_start();
-require_once 'db.php';
-
-if (!isset($_SESSION['user_id'])) {
+if (!isset($_SESSION['user_id']) || $_SESSION['role'] != 'admin') {
     header("Location: login.php");
     exit;
 }
-
-$success_message = '';
-$error_messages = [];
-
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_prices']) && isset($_POST['company_id'])) {
-    $company_id = $_POST['company_id'];
-    $prices = $_POST['prices'];
-    $all_valid = true;
-
-    foreach ($prices as $product_id => $price) {
-        if ($price === '' || $price === null) {
-            continue;
-        }
-        if (!is_numeric($price) || $price < 0) {
-            $all_valid = false;
-            $error_messages[] = "Invalid price for product ID $product_id. Price must be a non-negative number.";
-        }
-    }
-
-    if ($all_valid) {
-        foreach ($prices as $product_id => $price) {
-            if ($price === '' || $price === null) {
-                continue;
-            }
-            $stmt = $conn->prepare("
-                INSERT INTO company_product_prices (company_id, product_id, price) 
-                VALUES (?, ?, ?) 
-                ON DUPLICATE KEY UPDATE price = ?
-            ");
-            $stmt->bind_param("iidd", $company_id, $product_id, $price, $price);
-            $stmt->execute();
-            $stmt->close();
-        }
-        $success_message = "Prices updated successfully!";
-    }
-}
-
+include 'db.php';
 include 'header.php';
 
-$model_sql = "SELECT model_id, name FROM models ORDER BY name";
-$model_result = $conn->query($model_sql);
-
-$product_sql = "SELECT p.product_id, p.name, p.price AS default_price, m.model_id, m.name AS model_name 
-                FROM products p 
-                LEFT JOIN models m ON p.model_id = m.model_id";
-$product_result = $conn->query($product_sql);
-
-$company_sql = "SELECT * FROM companies ORDER BY name";
+// Fetch companies for dropdown
+$company_sql = "SELECT company_id, name FROM companies ORDER BY name";
 $company_result = $conn->query($company_sql);
+if (!$company_result) {
+    die("Error fetching companies: " . $conn->error);
+}
 
-$current_prices = [];
-if (isset($_POST['company_id'])) {
-    $company_id = $_POST['company_id'];
-    $stmt = $conn->prepare("
-        SELECT product_id, price 
-        FROM company_product_prices 
-        WHERE company_id = ?
-    ");
-    $stmt->bind_param("i", $company_id);
+// Fetch receipts based on company, tax type, status, and PO number search
+$receipts = [];
+$selected_company_id = isset($_GET['company_id']) ? (int)$_GET['company_id'] : 0;
+$selected_tax_type = isset($_GET['tax_type']) ? trim($_GET['tax_type']) : '';
+$selected_status = isset($_GET['status']) ? trim($_GET['status']) : 'approved';
+$po_search = isset($_GET['po_search']) ? trim($_GET['po_search']) : '';
+
+if ($selected_company_id > 0 && in_array($selected_tax_type, ['inclusive', 'exclusive']) && in_array($selected_status, ['approved', 'canceled'])) {
+    $sql = "SELECT r.receipt_id, r.file_name, r.dr_file_name, r.po_file_name, r.po_number, r.upload_date, r.tax_type, r.status, c.name AS company_name 
+            FROM receipts r 
+            JOIN companies c ON r.company_id = c.company_id 
+            WHERE r.company_id = ? AND r.tax_type = ? AND r.status = ?";
+    if (!empty($po_search)) {
+        $sql .= " AND (r.po_number LIKE ? OR r.file_name LIKE ? OR r.dr_file_name LIKE ? OR r.po_file_name LIKE ?)";
+    }
+    $sql .= " ORDER BY r.upload_date DESC";
+    
+    $stmt = $conn->prepare($sql);
+    if (!empty($po_search)) {
+        $po_like = "%$po_search%";
+        $stmt->bind_param("issssss", $selected_company_id, $selected_tax_type, $selected_status, $po_like, $po_like, $po_like, $po_like);
+    } else {
+        $stmt->bind_param("iss", $selected_company_id, $selected_tax_type, $selected_status);
+    }
     $stmt->execute();
-    $price_result = $stmt->get_result();
-    while ($row = $price_result->fetch_assoc()) {
-        $current_prices[$row['product_id']] = $row['price'];
+    $result = $stmt->get_result();
+    while ($row = $result->fetch_assoc()) {
+        $receipts[] = $row;
     }
     $stmt->close();
 }
 ?>
 
-<div class="container">
-    <h2 class="text-center mb-4">Price Configuration</h2>
-    <?php if ($success_message): ?>
-        <div class="alert alert-success alert-dismissible fade show" role="alert">
-            <?php echo $success_message; ?>
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
-    <?php endif; ?>
-    <?php if (!empty($error_messages)): ?>
-        <div class="alert alert-danger alert-dismissible fade show" role="alert">
-            <ul class="mb-0">
-                <?php foreach ($error_messages as $error): ?>
-                    <li><?php echo htmlspecialchars($error); ?></li>
-                <?php endforeach; ?>
-            </ul>
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
-    <?php endif; ?>
-    <div class="card p-4">
-        <form method="POST" action="" id="priceForm">
-            <div class="mb-4 row">
-                <div class="col-md-6">
-                    <label for="company_select" class="form-label">Select Company</label>
-                    <select class="form-select" id="company_select" name="company_id" required onchange="this.form.submit()">
-                        <option value="" disabled <?php echo !isset($_POST['company_id']) ? 'selected' : ''; ?>>Choose a company</option>
-                        <?php 
-                        $company_result->data_seek(0);
-                        while ($company = $company_result->fetch_assoc()): ?>
-                            <option value="<?php echo $company['company_id']; ?>" <?php echo isset($_POST['company_id']) && $_POST['company_id'] == $company['company_id'] ? 'selected' : ''; ?>>
-                                <?php echo htmlspecialchars($company['name']); ?>
-                            </option>
-                        <?php endwhile; ?>
-                    </select>
-                </div>
-                <div class="col-md-6">
-                    <label for="model_filter" class="form-label">Filter by Model</label>
-                    <select class="form-select" id="model_filter">
-                        <option value="">All Models</option>
-                        <?php 
-                        $model_result->data_seek(0);
-                        while ($model = $model_result->fetch_assoc()): ?>
-                            <option value="<?php echo $model['model_id']; ?>">
-                                <?php echo htmlspecialchars($model['name']); ?>
-                            </option>
-                        <?php endwhile; ?>
-                    </select>
-                </div>
+<div class="main-content">
+    <div class="container">
+        <div class="card">
+            <div class="card-header">
+                <span>View Receipts</span>
+                <i class="fas fa-file-invoice fa-lg"></i>
             </div>
-            <div class="price-list">
-                <?php 
-                $product_result->data_seek(0);
-                while ($product = $product_result->fetch_assoc()): 
-                    $product_id = $product['product_id'];
-                    $default_price = $product['default_price'];
-                    $current_price = isset($current_prices[$product_id]) ? $current_prices[$product_id] : $default_price;
-                ?>
-                    <div class="price-item" data-model-id="<?php echo $product['model_id']; ?>">
-                        <div class="d-flex align-items-center">
-                            <i class="fas fa-box me-3 text-muted"></i>
-                            <div>
-                                <label class="product-name"><?php echo htmlspecialchars($product['name']); ?></label>
-                                <p class="current-price text-muted mb-0">
-                                    Model: <?php echo htmlspecialchars($product['model_name'] ?? 'No Model'); ?>
-                                    | Default: $<?php echo number_format($default_price, 2); ?>
-                                    <?php if (isset($current_prices[$product_id])): ?>
-                                        | Current: $<?php echo number_format($current_prices[$product_id], 2); ?>
-                                    <?php endif; ?>
-                                </p>
-                            </div>
+            <div class="card-body">
+                <form method="GET" class="mb-4">
+                    <div class="row align-items-end">
+                        <div class="col-md-3 mb-3">
+                            <label for="company_select" class="form-label">Select Company</label>
+                            <select class="form-select" id="company_select" name="company_id" onchange="this.form.submit()">
+                                <option value="" <?php echo $selected_company_id == 0 ? 'selected' : ''; ?>>Select a company</option>
+                                <?php 
+                                if ($company_result->num_rows > 0) {
+                                    $company_result->data_seek(0);
+                                    while ($company = $company_result->fetch_assoc()): ?>
+                                        <option value="<?php echo $company['company_id']; ?>" <?php echo $selected_company_id == $company['company_id'] ? 'selected' : ''; ?>>
+                                            <?php echo htmlspecialchars($company['name']); ?>
+                                        </option>
+                                    <?php endwhile;
+                                } else {
+                                    echo '<option value="" disabled>No companies available</option>';
+                                }
+                                ?>
+                            </select>
                         </div>
-                        <input type="number" step="0.01" min="0" 
-                               name="prices[<?php echo $product['product_id']; ?>]" 
-                               class="form-control custom-price" 
-                               placeholder="Custom Price"
-                               value="<?php echo $current_price !== null ? $current_price : ''; ?>">
+                        <div class="col-md-3 mb-3">
+                            <label for="tax_type" class="form-label">Tax Type</label>
+                            <select class="form-select" id="tax_type" name="tax_type" onchange="this.form.submit()" <?php echo $selected_company_id == 0 ? 'disabled' : ''; ?>>
+                                <option value="" <?php echo empty($selected_tax_type) ? 'selected' : ''; ?>>Select tax type</option>
+                                <option value="inclusive" <?php echo $selected_tax_type == 'inclusive' ? 'selected' : ''; ?>>Tax Inclusive</option>
+                                <option value="exclusive" <?php echo $selected_tax_type == 'exclusive' ? 'selected' : ''; ?>>Tax Exclusive</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label for="status" class="form-label">Status</label>
+                            <select class="form-select" id="status" name="status" onchange="this.form.submit()" <?php echo $selected_company_id == 0 ? 'disabled' : ''; ?>>
+                                <option value="approved" <?php echo $selected_status == 'approved' ? 'selected' : ''; ?>>Approved</option>
+                                <option value="canceled" <?php echo $selected_status == 'canceled' ? 'selected' : ''; ?>>Canceled</option>
+                            </select>
+                        </div>
+                        <?php if ($selected_company_id > 0 && $selected_tax_type): ?>
+                            <div class="col-md-3 mb-3">
+                                <label for="po_search" class="form-label">Search PO Number</label>
+                                <div class="input-group">
+                                    <input type="text" class="form-control search-bar" id="po_search" name="po_search" value="<?php echo htmlspecialchars($po_search); ?>" placeholder="Enter PO Number">
+                                    <button type="submit" class="btn btn-primary"><i class="fas fa-search"></i></button>
+                                </div>
+                            </div>
+                        <?php endif; ?>
                     </div>
-                <?php endwhile; ?>
+                </form>
+
+                <?php if ($selected_company_id > 0 && $selected_tax_type && $selected_status): ?>
+                    <h4 class="company-title">Receipts for <?php echo htmlspecialchars($receipts[0]['company_name'] ?? ''); ?> (<?php echo ucfirst($selected_tax_type); ?>, <?php echo ucfirst($selected_status); ?>)</h4>
+                    <?php if (empty($receipts)): ?>
+                        <div class="no-data">
+                            <i class="fas fa-exclamation-circle fa-2x mb-2"></i>
+                            <p>No <?php echo $selected_tax_type; ?> <?php echo $selected_status; ?> receipts found for this company<?php echo !empty($po_search) ? " with PO number '$po_search'" : ''; ?>.</p>
+                        </div>
+                    <?php else: ?>
+                        <div class="table-container">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>Receipt ID</th>
+                                        <?php if ($selected_tax_type === 'inclusive' && $selected_status === 'approved'): ?>
+                                            <th>Sales Invoice</th>
+                                        <?php endif; ?>
+                                        <?php if ($selected_status === 'approved'): ?>
+                                            <th>Delivery Receipt</th>
+                                            <th>Purchase Order</th>
+                                        <?php endif; ?>
+                                        <th>PO Number</th>
+                                        <th>Upload Date</th>
+                                        <th>Tax Type</th>
+                                        <th>Status</th>
+                                        <?php if ($selected_status === 'approved'): ?>
+                                            <th>Actions</th>
+                                        <?php endif; ?>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php foreach ($receipts as $receipt): ?>
+                                        <tr>
+                                            <td><?php echo $receipt['receipt_id']; ?></td>
+                                            <?php if ($selected_tax_type === 'inclusive' && $selected_status === 'approved'): ?>
+                                                <td><?php echo $receipt['file_name'] ? htmlspecialchars($receipt['file_name']) : '<span class="text-muted">N/A</span>'; ?></td>
+                                            <?php endif; ?>
+                                            <?php if ($selected_status === 'approved'): ?>
+                                                <td><?php echo $receipt['dr_file_name'] ? htmlspecialchars($receipt['dr_file_name']) : '<span class="text-muted">N/A</span>'; ?></td>
+                                                <td><?php echo $receipt['po_file_name'] ? htmlspecialchars($receipt['po_file_name']) : '<span class="text-muted">N/A</span>'; ?></td>
+                                            <?php endif; ?>
+                                            <td><?php echo $receipt['po_number'] ? htmlspecialchars($receipt['po_number']) : '<span class="text-muted">N/A</span>'; ?></td>
+                                            <td><?php echo $receipt['upload_date']; ?></td>
+                                            <td><?php echo ucfirst($receipt['tax_type']); ?></td>
+                                            <td><?php echo ucfirst($receipt['status']); ?></td>
+                                            <?php if ($selected_status === 'approved'): ?>
+                                                <td>
+                                                    <?php if ($selected_tax_type === 'inclusive' && $receipt['file_name']): ?>
+                                                        <a href="Uploads/receipts/<?php echo htmlspecialchars($receipt['file_name']); ?>" target="_blank" class="btn btn-action btn-view" title="View Receipt"><i class="fas fa-eye"></i></a>
+                                                    <?php endif; ?>
+                                                    <?php if ($receipt['dr_file_name']): ?>
+                                                        <a href="Uploads/receipts/<?php echo htmlspecialchars($receipt['dr_file_name']); ?>" target="_blank" class="btn btn-action btn-view" title="View Delivery Receipt"><i class="fas fa-eye"></i></a>
+                                                    <?php endif; ?>
+                                                    <?php if ($receipt['po_file_name']): ?>
+                                                        <a href="Uploads/receipts/<?php echo htmlspecialchars($receipt['po_file_name']); ?>" target="_blank" class="btn btn-action btn-view" title="View Purchase Order"><i class="fas fa-eye"></i></a>
+                                                    <?php endif; ?>
+                                                    <?php if ($receipt['dr_file_name'] || $receipt['po_file_name'] || ($selected_tax_type === 'inclusive' && $receipt['file_name'])): ?>
+                                                        <a href="download_receipts.php?receipt_id=<?php echo $receipt['receipt_id']; ?>" class="btn btn-action btn-download" title="Download All Files"><i class="fas fa-download"></i></a>
+                                                    <?php endif; ?>
+                                                </td>
+                                            <?php endif; ?>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    <?php endif; ?>
+                <?php else: ?>
+                    <div class="no-data">
+                        <i class="fas fa-info-circle fa-2x mb-2"></i>
+                        <p>Please select a company, tax type, and status to view receipts.</p>
+                    </div>
+                <?php endif; ?>
             </div>
-            <button type="submit" name="update_prices" class="btn btn-success">Update Prices</button>
-        </form>
+        </div>
     </div>
 </div>
 
+<?php include 'footer.php'; ?>
+<script src="https://code.jquery.com/jquery-3.5.1.min.js" integrity="sha256-9/aliU8dGd2tb6OSsuzixeV4y/faTqgFtohetphbbj0=" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <style>
     .card {
-        border-radius: 12px;
-        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+        border: none;
+        border-radius: 20px;
+        background: #ffffff;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+        overflow: hidden;
     }
-    .price-list {
-        max-width: 1500px;
-        margin: 20px 0;
-    }
-    .price-item {
+    .card-header {
+        background: #21871e;
+        color: #fff;
+        padding: 20px;
+        font-size: 1.5rem;
+        font-weight: 600;
+        border-bottom: none;
         display: flex;
         justify-content: space-between;
         align-items: center;
-        padding: 20px;
-        background: linear-gradient(145deg, #ffffff, #f1f3f5);
-        border-radius: 12px;
-        margin-bottom: 15px;
-        box-shadow: 5px 5px 15px rgba(0, 0, 0, 0.1), -5px -5px 15px rgba(255, 255, 255, 0.8);
-        transition: transform 0.3s ease, box-shadow 0.3s ease;
     }
-    .price-item:hover {
-        transform: translateY(-3px);
-        box-shadow: 8px 8px 20px rgba(0, 0, 0, 0.15), -8px -8px 20px rgba(255, 255, 255, 0.9);
+    .card-body {
+        padding: 30px;
     }
-    .price-item .product-name {
-        font-weight: 600;
-        color: #2a6041;
-        font-size: 1.1rem;
-    }
-    .price-item .current-price {
-        font-size: 0.9rem;
-        color: #6c757d;
-    }
-    .price-item i {
-        font-size: 1.2rem;
-        color: #6c757d;
-    }
-    .price-item input.custom-price {
-        width: 150px;
-        border-radius: 8px;
-        border: 1px solid #ced4da;
-        transition: border-color 0.3s ease;
-    }
-    .price-item input.custom-price:focus {
-        border-color: #2a6041;
-        box-shadow: 0 0 5px rgba(42, 96, 65, 0.2);
-    }
-    .form-select {
-        border-radius: 8px;
-        border: 1px solid #ced4da;
-        transition: border-color 0.3s ease;
-    }
-    .form-select:focus {
-        border-color: #2a6041;
-        box-shadow: 0 0 5px rgba(42, 96, 65, 0.2);
-    }
-    .btn-success {
-        background-color: #2a6041;
-        border: none;
-        padding: 8px 20px;
+    .form-label {
         font-weight: 500;
-        border-radius: 8px;
-        transition: background-color 0.3s ease;
+        color: #2c3e50;
+        margin-bottom: 8px;
     }
-    .btn-success:hover {
-        background-color: #3d8c5e;
+    .form-select, .form-control {
+        border-radius: 10px;
+        border: 1px solid #d1d9e6;
+        padding: 10px;
+        background: #f9fafc;
+        transition: all 0.3s ease;
+    }
+    .form-select:focus, .form-control:focus {
+        border-color: #007bff;
+        box-shadow: 0 0 8px rgba(0, 123, 255, 0.2);
+        background: #fff;
+    }
+    .input-group .btn-primary {
+        border-radius: 0 10px 10px 0;
+        padding: 10px 20px;
+        background: #007bff;
+        border: none;
+        transition: background 0.3s ease;
+    }
+    .input-group .btn-primary:hover {
+        background: #0056b3;
+    }
+    .table-container {
+        background: #fff;
+        border-radius: 15px;
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+        overflow-x: auto;
+    }
+    .table {
+        margin-bottom: 0;
+        table-layout: fixed;
+        width: 100%;
+    }
+    .table thead th {
+        background: #21871e;
+        color: #fff;
+        border: none;
+        padding: 15px;
+        font-weight: 500;
+    }
+    .table tbody tr {
+        transition: all 0.3s ease;
+    }
+    .table tbody tr:hover {
+        background: #f1f8ff;
+        transform: scale(1.01);
+    }
+    .table td, .table th {
+        vertical-align: middle;
+        padding: 15px;
+        color: #34495e;
+        word-wrap: break-word;
+    }
+    <?php if ($selected_tax_type === 'inclusive' && $selected_status === 'approved'): ?>
+        .table th:nth-child(1), .table td:nth-child(1) { width: 8%; } /* Receipt ID */
+        .table th:nth-child(2), .table td:nth-child(2) { width: 15%; } /* Sales Invoice */
+        .table th:nth-child(3), .table td:nth-child(3) { width: 15%; } /* Delivery Receipt */
+        .table th:nth-child(4), .table td:nth-child(4) { width: 15%; } /* Purchase Order */
+        .table th:nth-child(5), .table td:nth-child(5) { width: 12%; } /* PO Number */
+        .table th:nth-child(6), .table td:nth-child(6) { width: 15%; } /* Upload Date */
+        .table th:nth-child(7), .table td:nth-child(7) { width: 10%; } /* Tax Type */
+        .table th:nth-child(8), .table td:nth-child(8) { width: 10%; } /* Status */
+        .table th:nth-child(9), .table td:nth-child(9) { width: 15%; min-width: 120px; } /* Actions */
+    <?php elseif ($selected_status === 'approved'): ?>
+        .table th:nth-child(1), .table td:nth-child(1) { width: 8%; } /* Receipt ID */
+        .table th:nth-child(2), .table td:nth-child(2) { width: 18%; } /* Delivery Receipt */
+        .table th:nth-child(3), .table td:nth-child(3) { width: 18%; } /* Purchase Order */
+        .table th:nth-child(4), .table td:nth-child(4) { width: 15%; } /* PO Number */
+        .table th:nth-child(5), .table td:nth-child(5) { width: 15%; } /* Upload Date */
+        .table th:nth-child(6), .table td:nth-child(6) { width: 10%; } /* Tax Type */
+        .table th:nth-child(7), .table td:nth-child(7) { width: 10%; } /* Status */
+        .table th:nth-child(8), .table td:nth-child(8) { width: 16%; min-width: 120px; } /* Actions */
+    <?php else: ?>
+        .table th:nth-child(1), .table td:nth-child(1) { width: 10%; } /* Receipt ID */
+        .table th:nth-child(2), .table td:nth-child(2) { width: 25%; } /* PO Number */
+        .table th:nth-child(3), .table td:nth-child(3) { width: 25%; } /* Upload Date */
+        .table th:nth-child(4), .table td:nth-child(4) { width: 20%; } /* Tax Type */
+        .table th:nth-child(5), .table td:nth-child(5) { width: 20%; } /* Status */
+    <?php endif; ?>
+    .btn-action {
+        border-radius: 8px;
+        padding: 5px 10px;
+        font-size: 0.85rem;
+        margin-right: 4px;
+        transition: all 0.3s ease;
+        display: inline-block;
+    }
+    .btn-view {
+        background: #28a745;
+        border: none;
+        color: #fff;
+    }
+    .btn-view:hover {
+        background: #218838;
+    }
+    .btn-download {
+        background: #17a2b8;
+        border: none;
+        color: #fff;
+    }
+    .btn-download:hover {
+        background: #138496;
+    }
+    .no-data {
+        text-align: center;
+        padding: 40px;
+        color: #7f8c8d;
+        font-size: 1.1rem;
+        background: #fff;
+        border-radius: 15px;
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+    }
+    .search-bar {
+        max-width: 350px;
+    }
+    .company-title {
+        color: #2c3e50;
+        font-weight: 600
+
+;
+        margin-bottom: 20px;
+        font-size: 1.3rem;
     }
     @media (max-width: 768px) {
-        .price-list {
-            max-width: 100%;
-        }
-        .price-item {
-            flex-direction: column;
-            align-items: flex-start;
-            padding: 15px;
-        }
-        .price-item input.custom-price {
-            width: 100%;
-            margin-top: 10px;
-        }
-        .price-item .product-name {
-            font-size: 1rem;
-        }
-        .price-item .current-price {
-            font-size: 0.85rem;
-        }
-        .price-item i {
-            font-size: 1rem;
-        }
+        .card-body { padding: 20px; }
+        .table td, .table th { font-size: 0.8rem; padding: 10px; }
+        .btn-action { padding: 4px 8px; font-size: 0.75rem; margin-right: 2px; }
+        .table td:nth-child(9) { display: flex; flex-wrap: wrap; gap: 5px; }
+        .input-group { flex-direction: column; }
+        .input-group .btn-primary { border-radius: 10px; margin-top: 10px; }
     }
 </style>
-
-<script src="https://code.jquery.com/jquery-3.5.1.min.js" integrity="sha256-9/aliU8dGd2tb6OSsuzixeV4y/faTqgFtohetphbbj0=" crossorigin="anonymous"></script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js" integrity="sha384-geWF76RCwLtnZ8qwWowPQNguL3RmwHVBC9FhGdlKrxdiJJigb/j/68SIy3Te4Bkz" crossorigin="anonymous"></script>
-<script>
-    $(document).ready(function() {
-        function filterProductsByModel(modelId) {
-            $('.price-item').each(function() {
-                var productModelId = $(this).data('model-id');
-                if (modelId === '' || productModelId == modelId) {
-                    $(this).show();
-                } else {
-                    $(this).hide();
-                }
-            });
-        }
-
-        $('#model_filter').on('change', function() {
-            var modelId = $(this).val();
-            filterProductsByModel(modelId);
-        });
-
-        filterProductsByModel('');
-
-        $('.dropdown-toggle').on('click', function(e) {
-            e.preventDefault();
-            $(this).next('.dropdown-menu').toggleClass('show');
-        });
-
-        $(document).on('click', function(e) {
-            if (!$(e.target).closest('.dropdown').length) {
-                $('.dropdown-menu').removeClass('show');
-            }
-        });
-
-        $('#priceForm').on('submit', function(e) {
-            let hasErrors = false;
-            $('.custom-price').each(function() {
-                const price = $(this).val();
-                if (price !== '' && (isNaN(price) || parseFloat(price) < 0)) {
-                    hasErrors = true;
-                    $(this).addClass('is-invalid');
-                } else {
-                    $(this).removeClass('is-invalid');
-                }
-            });
-
-            if (hasErrors) {
-                e.preventDefault();
-                alert('Please correct the invalid prices. Prices must be non-negative numbers.');
-            }
-        });
-
-        $('.custom-price').on('input', function() {
-            const price = $(this).val();
-            if (price === '' || (!isNaN(price) && parseFloat(price) >= 0)) {
-                $(this).removeClass('is-invalid');
-            }
-        });
-    });
-</script>
-
-</div>
 </body>
 </html>
-<?php 
-include 'footer.php'; 
-$conn->close(); 
-?>
+<?php $conn->close(); ?>
